@@ -2,28 +2,72 @@ using UnityEngine;
 
 public class ThrowableItem : MonoBehaviour
 {
-    public int maxBounces = 2; // จำนวนครั้งสูงสุดที่จะให้เด้งก่อนแตก
-    private int currentBounces = 0;
+    [Header("Damage Settings")]
+    public float baseDamage = 20f;
+    public float bonusDamagePerBounce = 5f;
+
+    [Header("Bounce Settings")]
+    public int maxGroundHits = 2;  
+    public int maxPropBounces = 4;  
+    public float maxLifeTime = 6f; 
+
+    private int currentTotalBounces = 0; 
+    private int groundHitCount = 0;     
+    private bool isDestroyed = false;
+
+    void Start()
+    {
+        Destroy(gameObject, maxLifeTime);
+    }
 
     private void OnCollisionEnter2D(Collision2D collision)
     {
-        // ถ้าโดน Prop หรือพื้น
-        if (collision.gameObject.CompareTag("Prop") || collision.gameObject.CompareTag("Ground"))
+        if (isDestroyed) return;
+        CharacterHealth health = collision.gameObject.GetComponent<CharacterHealth>();
+        if (health != null)
         {
-            currentBounces++;
+            float totalDamage = baseDamage + (currentTotalBounces * bonusDamagePerBounce);
+            health.TakeDamage(totalDamage);
 
-            // เล่นเสียงกระดอน / Effect ฝุ่น
-            if (currentBounces > maxBounces)
+            Debug.Log($"💥 โดนเป้าหมาย! เด้งรวม {currentTotalBounces} ครั้ง ดาเมจสุทธิ: {totalDamage}");
+            DestroyProjectile();
+            return;
+        }
+        if (collision.gameObject.CompareTag("Ground"))
+        {
+            groundHitCount++;
+            currentTotalBounces++;
+            if (groundHitCount >= maxGroundHits)
             {
-                Destroy(gameObject); // เด้งครบโควตาแล้วทำลายตัวเอง
+                DestroyProjectile();
+                return;
             }
         }
-        // ถ้าโดนตัวละครฝั่งตรงข้าม
-        else if (collision.gameObject.CompareTag("Player"))
+        else if (collision.gameObject.CompareTag("Prop"))
         {
-            // ทำดาเมจ แล้วทำลาย
-            Destroy(gameObject);
+            currentTotalBounces++;
+            if (currentTotalBounces >= maxPropBounces)
+            {
+                DestroyProjectile();
+            }
         }
     }
-} 
 
+    private void DestroyProjectile()
+    {
+        if (isDestroyed) return;
+        isDestroyed = true;
+
+        FindAnyObjectByType<TurnManager>()?.OnProjectileDestroyed();
+        Destroy(gameObject);
+    }
+
+    private void OnDestroy()
+    {
+        if (!isDestroyed)
+        {
+            isDestroyed = true;
+            FindAnyObjectByType<TurnManager>()?.OnProjectileDestroyed();
+        }
+    }
+}

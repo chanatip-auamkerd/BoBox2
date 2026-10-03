@@ -14,9 +14,10 @@ public class TrajectoryLine : MonoBehaviour
         lineRenderer = GetComponent<LineRenderer>();
     }
 
-    // ฟังก์ชันใหม่: ลากเส้นตรงเป๊ะไปหาตำแหน่งเมาส์
     public void DrawTrajectoryToTarget(Vector2 startPos, Vector2 initialVelocity, float totalTime)
     {
+        if (lineRenderer == null) lineRenderer = GetComponent<LineRenderer>();
+
         lineRenderer.enabled = true;
         lineRenderer.positionCount = resolution;
 
@@ -31,9 +32,10 @@ public class TrajectoryLine : MonoBehaviour
         }
     }
 
-    // ฟังก์ชันเดิม: คงไว้กัน Error จากสคริปต์อื่นที่เรียกใช้
     public void DrawTrajectory(Vector2 startPos, Vector2 initialVelocity)
     {
+        if (lineRenderer == null) lineRenderer = GetComponent<LineRenderer>();
+
         lineRenderer.enabled = true;
         lineRenderer.positionCount = resolution;
 
@@ -49,6 +51,17 @@ public class TrajectoryLine : MonoBehaviour
 
     public void HideLine()
     {
+        if (lineRenderer == null) lineRenderer = GetComponent<LineRenderer>();
+
+        lineRenderer.positionCount = 0;
         lineRenderer.enabled = false;
+        gameObject.SetActive(false); 
+    }
+
+    public void ShowLine()
+    {
+        gameObject.SetActive(true);
+        if (lineRenderer == null) lineRenderer = GetComponent<LineRenderer>();
+        lineRenderer.enabled = true;
     }
 }
