@@ -5,19 +5,25 @@ using UnityEngine.SceneManagement;
 
 public class CharacterHealth : MonoBehaviour
 {
+    public static string winnerMessage = "PLAYER 1 WINS!";
+    public static int winnerIndex = 1;
+
     [Header("Identity")]
-    [Tooltip("ติ๊กถูกถ้าคอมโพเนนต์นี้แปะอยู่ที่ตัว Player (ถ้าเป็น Bot ให้ติ๊กออก)")]
     public bool isPlayer = true;
+    [Tooltip("1 สำหรับ P1, 2 สำหรับ P2")]
+    public int playerIndex = 1;
 
     [Header("Health Settings")]
     public float maxHealth = 100f;
     public float currentHealth;
     public Slider healthSlider;
 
-    [Header("Game Over Scene Names")]
-    public string winSceneName = "WinScene";
-    public string loseSceneName = "LoseScene";
-    public float sceneLoadDelay = 1.0f; 
+    [Header("Scene Settings")]
+    [Tooltip("ชื่อ Scene หน้าจบเกมของโหมด PvP")]
+    public string pvpGameOverScene = "PvP_GameOverScene";
+    public string soloWinScene = "WinScene";
+    public string soloLoseScene = "LoseScene";
+    public float sceneLoadDelay = 1.0f;
 
     private bool isDead = false;
 
@@ -56,6 +62,7 @@ public class CharacterHealth : MonoBehaviour
         isDead = true;
 
         FindAnyObjectByType<TurnManager>()?.gameObject.SetActive(false);
+        FindAnyObjectByType<TurnManagerPvP>()?.gameObject.SetActive(false);
 
         StartCoroutine(LoadGameOverSceneRoutine());
     }
@@ -64,13 +71,33 @@ public class CharacterHealth : MonoBehaviour
     {
         yield return new WaitForSeconds(sceneLoadDelay);
 
-        if (isPlayer)
+        bool isPvP = FindAnyObjectByType<TurnManagerPvP>() != null || playerIndex == 2;
+
+        if (isPvP)
         {
-            SceneManager.LoadScene(loseSceneName);
+            if (playerIndex == 1)
+            {
+                winnerIndex = 2;
+                winnerMessage = "PLAYER 2 WINS!";
+            }
+            else
+            {
+                winnerIndex = 1;
+                winnerMessage = "PLAYER 1 WINS!";
+            }
+
+            SceneManager.LoadScene(pvpGameOverScene);
         }
         else
         {
-            SceneManager.LoadScene(winSceneName);
+            if (isPlayer)
+            {
+                SceneManager.LoadScene(soloLoseScene);
+            }
+            else
+            {
+                SceneManager.LoadScene(soloWinScene);
+            }
         }
     }
 }

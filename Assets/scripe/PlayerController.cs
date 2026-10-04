@@ -7,6 +7,9 @@ using UnityEngine.InputSystem;
 
 public class PlayerController : MonoBehaviour
 {
+    [Header("Player Identity")]
+    public int playerIndex = 1; // 1 = P1 (ฝั่งซ้าย), 2 = P2 (ฝั่งขวา)
+
     [Header("References")]
     public Transform throwPoint;
     public GameObject projectilePrefab;
@@ -22,10 +25,10 @@ public class PlayerController : MonoBehaviour
     public bool isAimLocked = false;
     public bool isRepositionMode = false;
 
-    [Header("Reposition Settings (ขอบเขตและการเดิน)")]
-    public float keyboardMoveSpeed = 6f; 
-    public float minX = -8.5f;        
-    public float maxX = -1.2f;         
+    [Header("Reposition Boundaries")]
+    public float keyboardMoveSpeed = 6f;
+    public float minX = -8.5f;
+    public float maxX = -1.2f;
     private float groundFixedY;
     private bool isDragging = false;
 
@@ -86,10 +89,12 @@ public class PlayerController : MonoBehaviour
     private void HandleRepositionInput()
     {
         float moveAxis = 0f;
+
 #if ENABLE_INPUT_SYSTEM
         var kb = Keyboard.current;
         if (kb != null)
         {
+            // P1 ใช้ปุ่ม A/D หรือปุ่มลูกศร, P2 รองรับปุ่มลูกศรและ A/D ตามตาเดิน
             if (kb.aKey.isPressed || kb.leftArrowKey.isPressed) moveAxis -= 1f;
             if (kb.dKey.isPressed || kb.rightArrowKey.isPressed) moveAxis += 1f;
         }
@@ -99,7 +104,7 @@ public class PlayerController : MonoBehaviour
 
         if (Mathf.Abs(moveAxis) > 0.01f)
         {
-            isDragging = false; 
+            isDragging = false;
             float newX = transform.position.x + (moveAxis * keyboardMoveSpeed * Time.deltaTime);
             newX = Mathf.Clamp(newX, minX, maxX);
             transform.position = new Vector3(newX, groundFixedY, transform.position.z);
@@ -179,7 +184,7 @@ public class PlayerController : MonoBehaviour
     public void ConfirmPosition()
     {
         isDragging = false;
-        FindAnyObjectByType<TurnManager>()?.ConfirmRepositionEarly();
+        FindAnyObjectByType<TurnManagerPvP>()?.ConfirmRepositionEarly();
     }
 
     private void HandleAimInput()
@@ -322,7 +327,16 @@ public class PlayerController : MonoBehaviour
             rb.linearVelocity = currentVelocity;
         }
 
-        FindAnyObjectByType<TurnManager>()?.OnItemThrown(true);
+        // แจ้ง TurnManager (รองรับทั้งโหมดเดิมและโหมด PvP)
+        var pvpManager = FindAnyObjectByType<TurnManagerPvP>();
+        if (pvpManager != null)
+        {
+            pvpManager.OnItemThrown(playerIndex);
+        }
+        else
+        {
+            FindAnyObjectByType<TurnManager>()?.OnItemThrown(true);
+        }
     }
 
     private Vector3 GetMouseWorldPosition()
@@ -338,7 +352,7 @@ public class PlayerController : MonoBehaviour
         return world;
     }
 
-    private void UpdateUIState()
+    public void UpdateUIState()
     {
         if (lockButton != null)
         {

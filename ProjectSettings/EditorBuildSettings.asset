@@ -6,14 +6,20 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/1.unity
+    path: Assets/Scene/1.unity
     guid: 143540316a503e8418cd33389a9cac42
   - enabled: 1
-    path: Assets/LoseScene.unity
+    path: Assets/Scene/LoseScene.unity
     guid: e461e95ce55837b479fbc8063524714d
   - enabled: 1
-    path: Assets/WinScene.unity
+    path: Assets/Scene/WinScene.unity
     guid: c4840f9fc9e399d4cb457cfa24ced52b
+  - enabled: 1
+    path: Assets/Scene/PvP_Scene.unity
+    guid: 446338207657a9442b364d662a408c64
+  - enabled: 1
+    path: Assets/Scene/PvP_GameOverScene.unity
+    guid: fe44ac969a98ff24caffd060dde0373e
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 2bcd2660ca9b64942af0de543d8d7100, type: 3}
   m_UseUCBPForAssetBundles: 0

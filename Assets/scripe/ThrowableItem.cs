@@ -3,16 +3,16 @@ using UnityEngine;
 public class ThrowableItem : MonoBehaviour
 {
     [Header("Damage Settings")]
-    public float baseDamage = 20f;        
+    public float baseDamage = 20f;         
     public float bonusDamagePerBounce = 5f; 
 
     [Header("Bounce Settings")]
     public int maxGroundHits = 2;          
     public int maxPropBounces = 4;         
-    public float maxLifeTime = 6f;      
+    public float maxLifeTime = 6f;        
 
-    private int currentTotalBounces = 0;   
-    private int groundHitCount = 0;         
+    private int currentTotalBounces = 0;    
+    private int groundHitCount = 0;        
     private bool isDestroyed = false;
 
     void Start()
@@ -23,7 +23,6 @@ public class ThrowableItem : MonoBehaviour
     private void OnCollisionEnter2D(Collision2D collision)
     {
         if (isDestroyed) return;
-
         CharacterHealth health = collision.gameObject.GetComponent<CharacterHealth>();
         if (health != null)
         {
@@ -34,6 +33,7 @@ public class ThrowableItem : MonoBehaviour
             DestroyProjectile();
             return;
         }
+
         if (collision.gameObject.CompareTag("Ground"))
         {
             groundHitCount++;
@@ -66,7 +66,7 @@ public class ThrowableItem : MonoBehaviour
         if (isDestroyed) return;
         isDestroyed = true;
 
-        FindAnyObjectByType<TurnManager>()?.OnProjectileDestroyed();
+        NotifyTurnManager();
         Destroy(gameObject);
     }
 
@@ -75,7 +75,22 @@ public class ThrowableItem : MonoBehaviour
         if (!isDestroyed)
         {
             isDestroyed = true;
-            FindAnyObjectByType<TurnManager>()?.OnProjectileDestroyed();
+            NotifyTurnManager();
+        }
+    }
+    private void NotifyTurnManager()
+    {
+        var pvpManager = FindAnyObjectByType<TurnManagerPvP>();
+        if (pvpManager != null)
+        {
+            pvpManager.OnProjectileDestroyed();
+            return;
+        }
+
+        var soloManager = FindAnyObjectByType<TurnManager>();
+        if (soloManager != null)
+        {
+            soloManager.OnProjectileDestroyed();
         }
     }
 }
