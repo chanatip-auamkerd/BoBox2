@@ -13,8 +13,8 @@ public class TurnManager : MonoBehaviour
     public TextMeshProUGUI turnText;
 
     [Header("Phase Settings")]
-    public float repositionDuration = 10f;
-    public float turnDuration = 15f;
+    public float repositionDuration = 10f; 
+    public float turnDuration = 15f;     
 
     public enum TurnState { RepositionPhase, PlayerTurn, BotTurn, WaitingForProjectile }
     public TurnState currentState;
@@ -48,7 +48,6 @@ public class TurnManager : MonoBehaviour
             OnTimeOut();
         }
     }
-
     public void StartPlayerRepositionPhase()
     {
         currentState = TurnState.RepositionPhase;
@@ -69,7 +68,6 @@ public class TurnManager : MonoBehaviour
             StartPlayerTurn();
         }
     }
-
     public void StartPlayerTurn()
     {
         currentState = TurnState.PlayerTurn;
@@ -85,7 +83,6 @@ public class TurnManager : MonoBehaviour
         currentTimer = turnDuration;
         isTimerRunning = true;
     }
-
     public void StartBotTurn()
     {
         currentState = TurnState.BotTurn;
@@ -117,6 +114,7 @@ public class TurnManager : MonoBehaviour
         }
         else if (currentState == TurnState.BotTurn)
         {
+            PropSpawner.Instance?.RespawnAllProps();
             StartPlayerRepositionPhase();
         }
     }
@@ -149,6 +147,8 @@ public class TurnManager : MonoBehaviour
         }
         else
         {
+            PropSpawner.Instance?.RespawnAllProps();
+
             StartPlayerRepositionPhase();
         }
     }

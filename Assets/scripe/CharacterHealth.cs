@@ -1,12 +1,25 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.SceneManagement;
 
 public class CharacterHealth : MonoBehaviour
 {
+    [Header("Identity")]
+    [Tooltip("ติ๊กถูกถ้าคอมโพเนนต์นี้แปะอยู่ที่ตัว Player (ถ้าเป็น Bot ให้ติ๊กออก)")]
+    public bool isPlayer = true;
+
     [Header("Health Settings")]
     public float maxHealth = 100f;
     public float currentHealth;
-    public Slider healthSlider; 
+    public Slider healthSlider;
+
+    [Header("Game Over Scene Names")]
+    public string winSceneName = "WinScene";
+    public string loseSceneName = "LoseScene";
+    public float sceneLoadDelay = 1.0f; 
+
+    private bool isDead = false;
 
     void Start()
     {
@@ -21,6 +34,8 @@ public class CharacterHealth : MonoBehaviour
 
     public void TakeDamage(float amount)
     {
+        if (isDead) return;
+
         currentHealth -= amount;
         currentHealth = Mathf.Clamp(currentHealth, 0, maxHealth);
 
@@ -37,7 +52,25 @@ public class CharacterHealth : MonoBehaviour
 
     private void Die()
     {
-        Debug.Log(gameObject.name + " พ่ายแพ้แล้ว!");
+        if (isDead) return;
+        isDead = true;
+
+        FindAnyObjectByType<TurnManager>()?.gameObject.SetActive(false);
+
+        StartCoroutine(LoadGameOverSceneRoutine());
     }
 
+    private IEnumerator LoadGameOverSceneRoutine()
+    {
+        yield return new WaitForSeconds(sceneLoadDelay);
+
+        if (isPlayer)
+        {
+            SceneManager.LoadScene(loseSceneName);
+        }
+        else
+        {
+            SceneManager.LoadScene(winSceneName);
+        }
+    }
 }
