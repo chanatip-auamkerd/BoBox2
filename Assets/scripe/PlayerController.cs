@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
@@ -10,29 +11,54 @@ public class PlayerController : MonoBehaviour
     public Transform throwPoint;
     public GameObject projectilePrefab;
     public TrajectoryLine trajectory;
+
+    [Header("UI Buttons")]
+    public Button lockButton;
+    public TextMeshProUGUI lockButtonText;
     public Button throwButton;
 
     [Header("Status")]
-    public bool isMyTurn = true;
+    public bool isMyTurn = false;
     public bool isAimLocked = false;
+    public bool isRepositionMode = false;
+
+    [Header("Reposition Settings (ขอบเขตและการเดิน)")]
+    public float keyboardMoveSpeed = 6f; 
+    public float minX = -8.5f;        
+    public float maxX = -1.2f;         
+    private float groundFixedY;
+    private bool isDragging = false;
 
     [Header("Trajectory Arc")]
-    [Tooltip("ความสูงส่วนโค้งเหนือจุดที่เล็ง")]
     public float arcHeight = 3.5f;
 
     private Vector2 currentVelocity;
     private float flightTime;
 
+    void Awake()
+    {
+        groundFixedY = transform.position.y;
+    }
+
     void Start()
     {
-        UpdateThrowButtonState();
+        if (lockButton != null) lockButton.onClick.AddListener(OnActionButtonClicked);
+        if (throwButton != null) throwButton.onClick.AddListener(Throw);
+
+        UpdateUIState();
     }
 
     void Update()
     {
+        if (isRepositionMode)
+        {
+            HandleRepositionInput();
+            return;
+        }
+
         if (!isMyTurn) return;
 
-        HandleInput();
+        HandleAimInput();
 
         if (!isAimLocked)
         {
@@ -40,57 +66,186 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    private void HandleInput()
+    public void EnableRepositionMode(bool enable)
     {
-        bool lockPressed = false;
+        isRepositionMode = enable;
+        isDragging = false;
+
+        transform.position = new Vector3(Mathf.Clamp(transform.position.x, minX, maxX), groundFixedY, transform.position.z);
+
+        if (enable)
+        {
+            isMyTurn = false;
+            isAimLocked = false;
+            if (trajectory != null) trajectory.HideLine();
+        }
+
+        UpdateUIState();
+    }
+
+    private void HandleRepositionInput()
+    {
+        float moveAxis = 0f;
+#if ENABLE_INPUT_SYSTEM
+        var kb = Keyboard.current;
+        if (kb != null)
+        {
+            if (kb.aKey.isPressed || kb.leftArrowKey.isPressed) moveAxis -= 1f;
+            if (kb.dKey.isPressed || kb.rightArrowKey.isPressed) moveAxis += 1f;
+        }
+#else
+        moveAxis = Input.GetAxisRaw("Horizontal");
+#endif
+
+        if (Mathf.Abs(moveAxis) > 0.01f)
+        {
+            isDragging = false; 
+            float newX = transform.position.x + (moveAxis * keyboardMoveSpeed * Time.deltaTime);
+            newX = Mathf.Clamp(newX, minX, maxX);
+            transform.position = new Vector3(newX, groundFixedY, transform.position.z);
+        }
+
+        HandleMouseDragging();
+
+        bool confirmKey = false;
+#if ENABLE_INPUT_SYSTEM
+        if (kb != null && (kb.spaceKey.wasPressedThisFrame || kb.enterKey.wasPressedThisFrame)) confirmKey = true;
+#else
+        if (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Return)) confirmKey = true;
+#endif
+        if (confirmKey)
+        {
+            ConfirmPosition();
+        }
+    }
+
+    private void HandleMouseDragging()
+    {
+        Vector3 mouseWorld = GetMouseWorldPosition();
+        bool isMouseDown = false;
+        bool isMouseUp = false;
+
+#if ENABLE_INPUT_SYSTEM
+        var mouse = Mouse.current;
+        if (mouse != null)
+        {
+            isMouseDown = mouse.leftButton.wasPressedThisFrame;
+            isMouseUp = mouse.leftButton.wasReleasedThisFrame;
+        }
+#else
+        isMouseDown = Input.GetMouseButtonDown(0);
+        isMouseUp = Input.GetMouseButtonUp(0);
+#endif
+
+        if (isMouseDown)
+        {
+            if (UnityEngine.EventSystems.EventSystem.current != null &&
+                UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject())
+            {
+                return;
+            }
+
+            Collider2D col = GetComponent<Collider2D>();
+            if (col != null && col.OverlapPoint(mouseWorld))
+            {
+                isDragging = true;
+            }
+        }
+
+        if (isMouseUp)
+        {
+            isDragging = false;
+        }
+
+        if (isDragging)
+        {
+            float clampedX = Mathf.Clamp(mouseWorld.x, minX, maxX);
+            transform.position = new Vector3(clampedX, groundFixedY, transform.position.z);
+        }
+    }
+
+    public void OnActionButtonClicked()
+    {
+        if (isRepositionMode)
+        {
+            ConfirmPosition();
+        }
+        else if (isMyTurn)
+        {
+            ToggleLockAim();
+        }
+    }
+
+    public void ConfirmPosition()
+    {
+        isDragging = false;
+        FindAnyObjectByType<TurnManager>()?.ConfirmRepositionEarly();
+    }
+
+    private void HandleAimInput()
+    {
+        bool lockTogglePressed = false;
         bool spacePressed = false;
+        bool cancelUnlockPressed = false;
 
 #if ENABLE_INPUT_SYSTEM
         var mouse = Mouse.current;
         var keyboard = Keyboard.current;
 
         if (keyboard != null && keyboard.spaceKey.wasPressedThisFrame) spacePressed = true;
-        if (mouse != null && mouse.rightButton.wasPressedThisFrame) lockPressed = true;
+        if (mouse != null && mouse.rightButton.wasPressedThisFrame) lockTogglePressed = true;
+
+        if (keyboard != null && (keyboard.escapeKey.wasPressedThisFrame || keyboard.deleteKey.wasPressedThisFrame))
+        {
+            cancelUnlockPressed = true;
+        }
+        if (mouse != null && mouse.leftButton.wasPressedThisFrame)
+        {
+            cancelUnlockPressed = true;
+        }
 #else
         if (Input.GetKeyDown(KeyCode.Space)) spacePressed = true;
-        if (Input.GetMouseButtonDown(1)) lockPressed = true;
+        if (Input.GetMouseButtonDown(1)) lockTogglePressed = true;
+
+        if (Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.Delete) || Input.GetMouseButtonDown(0))
+        {
+            cancelUnlockPressed = true;
+        }
 #endif
 
-        if (lockPressed)
+        if (isAimLocked && cancelUnlockPressed)
+        {
+            if (UnityEngine.EventSystems.EventSystem.current == null ||
+                !UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject())
+            {
+                ToggleLockAim();
+                return;
+            }
+        }
+
+        if (lockTogglePressed)
         {
             ToggleLockAim();
         }
 
         if (spacePressed)
         {
-            if (!isAimLocked)
-            {
-                ToggleLockAim();
-            }
-            else
-            {
-                Throw();
-            }
+            if (!isAimLocked) ToggleLockAim();
+            else Throw();
         }
     }
 
-    private void ToggleLockAim()
+    public void ToggleLockAim()
     {
+        if (!isMyTurn || isRepositionMode) return;
+
         isAimLocked = !isAimLocked;
-        UpdateThrowButtonState();
+        UpdateUIState();
     }
 
     private void UpdateAim()
     {
-        Vector3 mouseScreenPos;
-#if ENABLE_INPUT_SYSTEM
-        mouseScreenPos = Mouse.current != null ? (Vector3)Mouse.current.position.ReadValue() : Input.mousePosition;
-#else
-        mouseScreenPos = Input.mousePosition;
-#endif
-
-        Vector3 mouseWorldPos = Camera.main.ScreenToWorldPoint(mouseScreenPos);
-        mouseWorldPos.z = 0f;
+        Vector3 mouseWorldPos = GetMouseWorldPosition();
 
         if (mouseWorldPos.x < transform.position.x)
         {
@@ -130,11 +285,11 @@ public class PlayerController : MonoBehaviour
     {
         isMyTurn = true;
         isAimLocked = false;
-        UpdateThrowButtonState();
+        UpdateUIState();
 
         if (trajectory != null)
         {
-            trajectory.ShowLine(); 
+            trajectory.ShowLine();
         }
     }
 
@@ -144,11 +299,13 @@ public class PlayerController : MonoBehaviour
 
         isMyTurn = false;
         isAimLocked = false;
-        UpdateThrowButtonState();
+        UpdateUIState();
+
         if (trajectory != null)
         {
             trajectory.HideLine();
         }
+
         GameObject obj = Instantiate(projectilePrefab, throwPoint.position, Quaternion.identity);
         obj.tag = "Projectile";
 
@@ -168,11 +325,43 @@ public class PlayerController : MonoBehaviour
         FindAnyObjectByType<TurnManager>()?.OnItemThrown(true);
     }
 
-    private void UpdateThrowButtonState()
+    private Vector3 GetMouseWorldPosition()
     {
+        Vector3 mouseScreen;
+#if ENABLE_INPUT_SYSTEM
+        mouseScreen = Mouse.current != null ? (Vector3)Mouse.current.position.ReadValue() : Input.mousePosition;
+#else
+        mouseScreen = Input.mousePosition;
+#endif
+        Vector3 world = Camera.main.ScreenToWorldPoint(mouseScreen);
+        world.z = 0f;
+        return world;
+    }
+
+    private void UpdateUIState()
+    {
+        if (lockButton != null)
+        {
+            lockButton.interactable = isRepositionMode || isMyTurn;
+        }
+
+        if (lockButtonText != null)
+        {
+            lockButtonText.color = Color.black;
+
+            if (isRepositionMode)
+            {
+                lockButtonText.text = "READY";
+            }
+            else
+            {
+                lockButtonText.text = isAimLocked ? "UNLOCK" : "LOCK";
+            }
+        }
+
         if (throwButton != null)
         {
-            throwButton.interactable = isMyTurn && isAimLocked;
+            throwButton.interactable = isMyTurn && isAimLocked && !isRepositionMode;
         }
     }
 }

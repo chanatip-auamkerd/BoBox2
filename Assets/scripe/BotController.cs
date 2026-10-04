@@ -7,6 +7,17 @@ public class BotController : MonoBehaviour
     public Transform throwPoint;
     public GameObject projectilePrefab;
     public Transform targetPlayer;
+    public TrajectoryLine botTrajectory;
+
+    [Header("Reposition (เขตพื้นที่เดินของ Bot ฝั่งขวา)")]
+    public float minX = 1.5f;
+    public float maxX = 7.5f;
+    public float moveSpeed = 4f;
+    private float groundFixedY;
+
+    [Header("Aiming & Delay Settings")]
+    [Tooltip("เวลาที่บอทจะโชว์เส้นวิถียิงค้างไว้ให้ผู้เล่นลุ้น (วินาที)")]
+    public float aimPreviewDuration = 1.2f;
 
     [Header("Bot Playstyle & Physics")]
     [Range(0f, 1f)] public float trickshotChance = 0.8f;
@@ -14,25 +25,52 @@ public class BotController : MonoBehaviour
     public float maxLaunchSpeed = 16f;
     public float aimOffsetSpread = 0.6f;
 
+    void Awake()
+    {
+        groundFixedY = transform.position.y;
+    }
+
     public void StartBotTurn()
     {
-        StartCoroutine(BotThinkAndThrowRoutine());
+        StartCoroutine(BotTurnRoutine());
     }
 
-    private IEnumerator BotThinkAndThrowRoutine()
+    private IEnumerator BotTurnRoutine()
     {
-        // ยืนคิดและเล็ง
-        yield return new WaitForSeconds(Random.Range(1.2f, 1.8f));
+        float targetDestinationX = Random.Range(minX, maxX);
 
-        ThrowWithTrickshot();
+        while (Mathf.Abs(transform.position.x - targetDestinationX) > 0.05f)
+        {
+            float step = moveSpeed * Time.deltaTime;
+            float newX = Mathf.MoveTowards(transform.position.x, targetDestinationX, step);
+            transform.position = new Vector3(newX, groundFixedY, transform.position.z);
+
+            if (targetDestinationX < transform.position.x)
+            {
+                transform.localScale = new Vector3(-Mathf.Abs(transform.localScale.x), transform.localScale.y, transform.localScale.z);
+            }
+            else
+            {
+                transform.localScale = new Vector3(Mathf.Abs(transform.localScale.x), transform.localScale.y, transform.localScale.z);
+            }
+
+            yield return null;
+        }
+
+        transform.position = new Vector3(targetDestinationX, groundFixedY, transform.position.z);
+        transform.localScale = new Vector3(-Mathf.Abs(transform.localScale.x), transform.localScale.y, transform.localScale.z);
+
+        yield return new WaitForSeconds(0.5f);
+
+        yield return StartCoroutine(AimAndThrowRoutine());
     }
 
-    private void ThrowWithTrickshot()
+    private IEnumerator AimAndThrowRoutine()
     {
         if (targetPlayer == null || projectilePrefab == null || throwPoint == null)
         {
             Debug.LogWarning("บอทยังใส่ References ไม่ครบ!");
-            return;
+            yield break;
         }
 
         Vector2 startPos = throwPoint.position;
@@ -59,13 +97,25 @@ public class BotController : MonoBehaviour
         );
 
         float selectedArc = Random.Range(1.5f, maxArcHeight);
-        Vector2 velocity = CalculateVelocity(startPos, targetAimPoint, selectedArc);
+        float flightTime;
+        Vector2 launchVelocity = CalculateVelocity(startPos, targetAimPoint, selectedArc, out flightTime);
 
-        if (velocity.magnitude > maxLaunchSpeed)
+        if (launchVelocity.magnitude > maxLaunchSpeed)
         {
-            velocity = velocity.normalized * maxLaunchSpeed;
+            launchVelocity = launchVelocity.normalized * maxLaunchSpeed;
         }
 
+        if (botTrajectory != null)
+        {
+            botTrajectory.ShowLine();
+            botTrajectory.DrawTrajectoryToTarget(startPos, launchVelocity, flightTime);
+        }
+        yield return new WaitForSeconds(aimPreviewDuration);
+
+        if (botTrajectory != null)
+        {
+            botTrajectory.HideLine();
+        }
         GameObject obj = Instantiate(projectilePrefab, throwPoint.position, Quaternion.identity);
         obj.tag = "Projectile";
 
@@ -79,14 +129,13 @@ public class BotController : MonoBehaviour
         Rigidbody2D rb = obj.GetComponent<Rigidbody2D>();
         if (rb != null)
         {
-            rb.linearVelocity = velocity;
+            rb.linearVelocity = launchVelocity;
         }
 
-        // แจ้ง TurnManager ว่าบอทปาแล้ว
         FindAnyObjectByType<TurnManager>()?.OnItemThrown(false);
     }
 
-    private Vector2 CalculateVelocity(Vector2 start, Vector2 target, float extraHeight)
+    private Vector2 CalculateVelocity(Vector2 start, Vector2 target, float extraHeight, out float totalTime)
     {
         float gravity = Mathf.Abs(Physics2D.gravity.y);
         float apexY = Mathf.Max(start.y, target.y) + extraHeight;
@@ -94,7 +143,7 @@ public class BotController : MonoBehaviour
         float vy = Mathf.Sqrt(2f * gravity * Mathf.Max(0.1f, apexY - start.y));
         float timeUp = vy / gravity;
         float timeDown = Mathf.Sqrt(2f * Mathf.Max(0.01f, apexY - target.y) / gravity);
-        float totalTime = Mathf.Max(0.1f, timeUp + timeDown);
+        totalTime = Mathf.Max(0.1f, timeUp + timeDown);
 
         float vx = (target.x - start.x) / totalTime;
         return new Vector2(vx, vy);

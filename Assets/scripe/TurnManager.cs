@@ -9,47 +9,67 @@ public class TurnManager : MonoBehaviour
     public BotController bot;
 
     [Header("UI References")]
-    public TextMeshProUGUI timerText; 
-    public TextMeshProUGUI turnText;  
+    public TextMeshProUGUI timerText;
+    public TextMeshProUGUI turnText;
 
-    [Header("Turn Timer Settings")]
+    [Header("Phase Settings")]
+    public float repositionDuration = 10f;
     public float turnDuration = 15f;
-    private float currentTurnTime;
-    private bool isTimerRunning = false;
 
-    public enum TurnState { PlayerTurn, BotTurn, WaitingForProjectile }
+    public enum TurnState { RepositionPhase, PlayerTurn, BotTurn, WaitingForProjectile }
     public TurnState currentState;
 
+    private float currentTimer;
+    private bool isTimerRunning = false;
     private bool wasPlayerLastThrow = false;
 
     void Start()
     {
-        StartPlayerTurn();
+        StartPlayerRepositionPhase();
     }
 
     void Update()
     {
-        if (isTimerRunning)
+        if (!isTimerRunning) return;
+
+        currentTimer -= Time.deltaTime;
+
+        if (timerText != null)
         {
-            currentTurnTime -= Time.deltaTime;
+            int totalSeconds = Mathf.CeilToInt(Mathf.Max(0, currentTimer));
+            int minutes = totalSeconds / 60;
+            int seconds = totalSeconds % 60;
+            timerText.text = string.Format("{0:00}:{1:00}", minutes, seconds);
+            timerText.color = totalSeconds <= 3 ? Color.red : Color.white;
+        }
 
-            if (timerText != null)
-            {
-                int totalSeconds = Mathf.CeilToInt(Mathf.Max(0, currentTurnTime));
-                int minutes = totalSeconds / 60;
-                int seconds = totalSeconds % 60;
-
-                timerText.text = string.Format("{0:00}:{1:00}", minutes, seconds);
-
-                timerText.color = totalSeconds <= 5 ? Color.red : Color.white;
-            }
-
-            if (currentTurnTime <= 0)
-            {
-                OnTimeOut();
-            }
+        if (currentTimer <= 0)
+        {
+            OnTimeOut();
         }
     }
+
+    public void StartPlayerRepositionPhase()
+    {
+        currentState = TurnState.RepositionPhase;
+        if (turnText != null)
+        {
+            turnText.text = "MOVE POSITION";
+            turnText.color = Color.yellow;
+        }
+
+        player.EnableRepositionMode(true);
+        currentTimer = repositionDuration;
+        isTimerRunning = true;
+    }
+    public void ConfirmRepositionEarly()
+    {
+        if (currentState == TurnState.RepositionPhase)
+        {
+            StartPlayerTurn();
+        }
+    }
+
     public void StartPlayerTurn()
     {
         currentState = TurnState.PlayerTurn;
@@ -59,8 +79,11 @@ public class TurnManager : MonoBehaviour
             turnText.color = Color.cyan;
         }
 
+        player.EnableRepositionMode(false);
         player.StartPlayerTurn();
-        ResetAndStartTimer();
+
+        currentTimer = turnDuration;
+        isTimerRunning = true;
     }
 
     public void StartBotTurn()
@@ -73,49 +96,44 @@ public class TurnManager : MonoBehaviour
         }
 
         bot.StartBotTurn();
-        ResetAndStartTimer();
-    }
-
-    private void ResetAndStartTimer()
-    {
-        currentTurnTime = turnDuration;
+        currentTimer = turnDuration;
         isTimerRunning = true;
     }
 
-    private void StopTimer()
-    {
-        isTimerRunning = false;
-    }
     private void OnTimeOut()
     {
-        StopTimer();
-        Debug.Log("⏰ เวลาหมด! สลับเทิร์น");
+        isTimerRunning = false;
 
-        if (currentState == TurnState.PlayerTurn)
+        if (currentState == TurnState.RepositionPhase)
+        {
+            StartPlayerTurn();
+        }
+        else if (currentState == TurnState.PlayerTurn)
         {
             player.isMyTurn = false;
             player.isAimLocked = false;
             if (player.trajectory != null) player.trajectory.HideLine();
-
             StartBotTurn();
         }
         else if (currentState == TurnState.BotTurn)
         {
-            StartPlayerTurn();
+            StartPlayerRepositionPhase();
         }
     }
+
     public void OnItemThrown(bool isPlayer)
     {
-        StopTimer(); 
+        isTimerRunning = false;
         wasPlayerLastThrow = isPlayer;
         currentState = TurnState.WaitingForProjectile;
 
         if (turnText != null)
         {
-            turnText.text = "ATTACKING...!"; 
+            turnText.text = "ATTACKING...";
             turnText.color = Color.yellow;
         }
     }
+
     public void OnProjectileDestroyed()
     {
         StartCoroutine(SwitchTurnRoutine());
@@ -131,7 +149,7 @@ public class TurnManager : MonoBehaviour
         }
         else
         {
-            StartPlayerTurn();
+            StartPlayerRepositionPhase();
         }
     }
 }
