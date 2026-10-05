@@ -253,6 +253,7 @@ GameObject:
   - component: {fileID: 266878731}
   - component: {fileID: 266878730}
   - component: {fileID: 266878734}
+  - component: {fileID: 266878735}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -301,6 +302,7 @@ MonoBehaviour:
   minLaunchForce: 6
   maxLaunchForce: 22
   forceSensitivity: 2.5
+  throwDelay: 0.18
   readyButton: {fileID: 0}
   lockButton: {fileID: 1039646363}
   lockButtonText: {fileID: 669177984}
@@ -413,7 +415,7 @@ SpriteRenderer:
   m_SortingOrder: 1
   m_MaskInteraction: 0
   m_Sprite: {fileID: -9095717837082945937, guid: 207ee8102dd4143d288186ef0be518ee, type: 3}
-  m_Color: {r: 0.36445355, g: 0.5498753, b: 0.8490566, a: 1}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
@@ -449,6 +451,24 @@ Rigidbody2D:
   m_SleepingMode: 1
   m_CollisionDetection: 1
   m_Constraints: 4
+--- !u!114 &266878735
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 266878728}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 412ffb2cafc7bb845b74d256d331f579, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerAnimationController
+  playerController: {fileID: 266878730}
+  spriteRenderer: {fileID: 266878733}
+  idleSprite: {fileID: 21300000, guid: af272384842576b41b8420e962273c7a, type: 3}
+  actionSprite: {fileID: 21300000, guid: 62e7fdc38630d4244885191534919bd6, type: 3}
+  useActionSpriteWhileAiming: 1
+  throwVisualDuration: 0.35
 --- !u!1 &270629894
 GameObject:
   m_ObjectHideFlags: 0
@@ -834,6 +854,7 @@ GameObject:
   - component: {fileID: 657254244}
   - component: {fileID: 657254242}
   - component: {fileID: 657254247}
+  - component: {fileID: 657254248}
   m_Layer: 0
   m_Name: Bot
   m_TagString: Untagged
@@ -863,6 +884,7 @@ MonoBehaviour:
   aimPreviewDuration: 2
   minLaunchForce: 8
   maxLaunchForce: 22
+  isAiming: 0
 --- !u!4 &657254243
 Transform:
   m_ObjectHideFlags: 0
@@ -987,7 +1009,7 @@ SpriteRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_Sprite: {fileID: -9095717837082945937, guid: 207ee8102dd4143d288186ef0be518ee, type: 3}
-  m_Color: {r: 0.8679245, g: 0.2988608, b: 0.2988608, a: 1}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
@@ -1023,6 +1045,27 @@ Rigidbody2D:
   m_SleepingMode: 1
   m_CollisionDetection: 1
   m_Constraints: 4
+--- !u!114 &657254248
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 657254241}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 45883fe8c28c301488a973af9d08ed2e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BotAnimationController
+  botController: {fileID: 657254242}
+  spriteRenderer: {fileID: 657254246}
+  idleSprite: {fileID: 21300000, guid: 819e06d742e6b364ebc4957b6375ebff, type: 3}
+  actionSprite: {fileID: 21300000, guid: c67b3e18ee7dd8948aba4edb9ba1ca76, type: 3}
+  idleFlipX: 0
+  actionFlipX: 0
+  useActionSpriteWhileAiming: 1
+  releaseDelay: 0.18
+  throwVisualDuration: 0.35
 --- !u!1 &669177982
 GameObject:
   m_ObjectHideFlags: 0
