@@ -184,7 +184,18 @@ public class PlayerController : MonoBehaviour
     public void ConfirmPosition()
     {
         isDragging = false;
-        FindAnyObjectByType<TurnManagerPvP>()?.ConfirmRepositionEarly();
+        var soloManager = FindAnyObjectByType<TurnManager>();
+        if (soloManager != null)
+        {
+            soloManager.ConfirmRepositionEarly();
+            return;
+        }
+
+        var pvpManager = FindAnyObjectByType<TurnManagerPvP>();
+        if (pvpManager != null)
+        {
+            pvpManager.ConfirmRepositionEarly();
+        }
     }
 
     private void HandleAimInput()
