@@ -6,27 +6,30 @@ public class PropSpawner : MonoBehaviour
     public static PropSpawner Instance;
 
     [Header("Prop Prefabs")]
+    [Tooltip("ใส่ Prefab สิ่งกีดขวางแบบต่างๆ เช่น แผ่นไม้, ลูกบอล, สามเหลี่ยม")]
     public GameObject[] propPrefabs;
 
     [Header("Spawn Count")]
-    public int minProps = 5;
-    public int maxProps = 8;
+    public int minProps = 8;   
+    public int maxProps = 13;  
 
     [Header("Spawn Area")]
-    public float minX = -3.8f;
-    public float maxX = 2.8f;
-    public float minY = 0.2f;
-    public float maxY = 3.8f;
+    public float minX = -4.2f; 
+    public float maxX = 3.2f;  
+    public float minY = 0.2f;  
+    public float maxY = 4.2f; 
 
     [Header("Spawn Spacing & Rules")]
-    public float minDistanceBetweenProps = 1.3f;
-    public int maxPlacementAttempts = 35;
+    [Tooltip("ระยะห่างขั้นต่ำระหว่าง Prop แต่ละชิ้น ยิ่งค่าน้อยยิ่งเกิดได้ชิดและหนาแน่น")]
+    public float minDistanceBetweenProps = 0.9f;
+    [Tooltip("จำนวนรอบการพยายามหาที่ว่าง ยิ่งเยอะยิ่งยัดของลงได้เยอะ")]
+    public int maxPlacementAttempts = 70;
 
     [Header("Random Variations")]
     public bool randomRotation = true;
     public float minAngle = -45f;
     public float maxAngle = 45f;
-    public Vector2 scaleRange = new Vector2(0.85f, 1.2f);
+    public Vector2 scaleRange = new Vector2(0.7f, 1.1f);
 
     private List<Vector2> spawnedPositions = new List<Vector2>();
 
@@ -39,7 +42,6 @@ public class PropSpawner : MonoBehaviour
     {
         RespawnAllProps();
     }
-
     public void RespawnAllProps()
     {
         foreach (Transform child in transform)
@@ -49,8 +51,11 @@ public class PropSpawner : MonoBehaviour
 
         spawnedPositions.Clear();
 
-        if (propPrefabs == null || propPrefabs.Length == 0) return;
-
+        if (propPrefabs == null || propPrefabs.Length == 0)
+        {
+            Debug.LogWarning("⚠️ ยังไม่ได้ใส่ Prop Prefabs ใน PropSpawner!");
+            return;
+        }
         int propsToSpawn = Random.Range(minProps, maxProps + 1);
 
         for (int i = 0; i < propsToSpawn; i++)
@@ -101,7 +106,6 @@ public class PropSpawner : MonoBehaviour
         }
         return true;
     }
-
     private void OnDrawGizmosSelected()
     {
         Gizmos.color = Color.cyan;

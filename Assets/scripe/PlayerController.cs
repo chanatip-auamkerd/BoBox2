@@ -1,50 +1,50 @@
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
-#if ENABLE_INPUT_SYSTEM
-using UnityEngine.InputSystem;
-#endif
 
 public class PlayerController : MonoBehaviour
 {
-    [Header("Player Identity")]
-    public int playerIndex = 1; // 1 = P1 (ฝั่งซ้าย), 2 = P2 (ฝั่งขวา)
+    [Header("Player Settings")]
+    [Tooltip("1 สำหรับ Player 1 (ฟ้า), 2 สำหรับ Player 2 (แดง)")]
+    public int playerIndex = 1;
+    public bool isMyTurn = false;
+    public bool isRepositionMode = false;
+    public bool isAimLocked = false;
 
-    [Header("References")]
+    [Header("Movement & Boundaries")]
+    public float moveSpeed = 5f;
+    public float minX = -7.5f;
+    public float maxX = -1.5f;
+    private float groundFixedY;
+    private bool isDragging = false;
+
+    [Header("Aiming & Throw Settings")]
     public Transform throwPoint;
     public GameObject projectilePrefab;
     public TrajectoryLine trajectory;
 
+    public float minLaunchForce = 6f;
+    public float maxLaunchForce = 22f;
+    public float forceSensitivity = 2.5f;
+
     [Header("UI Buttons")]
+    public Button readyButton;
     public Button lockButton;
     public TextMeshProUGUI lockButtonText;
     public Button throwButton;
 
-    [Header("Status")]
-    public bool isMyTurn = false;
-    public bool isAimLocked = false;
-    public bool isRepositionMode = false;
-
-    [Header("Reposition Boundaries")]
-    public float keyboardMoveSpeed = 6f;
-    public float minX = -8.5f;
-    public float maxX = -1.2f;
-    private float groundFixedY;
-    private bool isDragging = false;
-
-    [Header("Trajectory Arc")]
-    public float arcHeight = 3.5f;
-
-    private Vector2 currentVelocity;
-    private float flightTime;
+    private Vector2 currentLaunchVelocity;
+    private Collider2D playerCollider;
 
     void Awake()
     {
         groundFixedY = transform.position.y;
+        playerCollider = GetComponent<Collider2D>();
     }
 
     void Start()
     {
+        if (readyButton != null) readyButton.onClick.AddListener(ConfirmPosition);
         if (lockButton != null) lockButton.onClick.AddListener(OnActionButtonClicked);
         if (throwButton != null) throwButton.onClick.AddListener(Throw);
 
@@ -61,14 +61,12 @@ public class PlayerController : MonoBehaviour
 
         if (!isMyTurn) return;
 
-        HandleAimInput();
-
-        if (!isAimLocked)
-        {
-            UpdateAim();
-        }
+        HandleAimingInput();
     }
 
+    // =========================================================================
+    // ฟังก์ชันที่ TurnManager และ TurnManagerPvP เรียกใช้งาน
+    // =========================================================================
     public void EnableRepositionMode(bool enable)
     {
         isRepositionMode = enable;
@@ -86,86 +84,93 @@ public class PlayerController : MonoBehaviour
         UpdateUIState();
     }
 
-    private void HandleRepositionInput()
+    public void StartPlayerTurn()
     {
-        float moveAxis = 0f;
+        isMyTurn = true;
+        isAimLocked = false;
+        isRepositionMode = false;
+        UpdateUIState();
 
-#if ENABLE_INPUT_SYSTEM
-        var kb = Keyboard.current;
-        if (kb != null)
+        if (trajectory != null)
         {
-            // P1 ใช้ปุ่ม A/D หรือปุ่มลูกศร, P2 รองรับปุ่มลูกศรและ A/D ตามตาเดิน
-            if (kb.aKey.isPressed || kb.leftArrowKey.isPressed) moveAxis -= 1f;
-            if (kb.dKey.isPressed || kb.rightArrowKey.isPressed) moveAxis += 1f;
-        }
-#else
-        moveAxis = Input.GetAxisRaw("Horizontal");
-#endif
-
-        if (Mathf.Abs(moveAxis) > 0.01f)
-        {
-            isDragging = false;
-            float newX = transform.position.x + (moveAxis * keyboardMoveSpeed * Time.deltaTime);
-            newX = Mathf.Clamp(newX, minX, maxX);
-            transform.position = new Vector3(newX, groundFixedY, transform.position.z);
-        }
-
-        HandleMouseDragging();
-
-        bool confirmKey = false;
-#if ENABLE_INPUT_SYSTEM
-        if (kb != null && (kb.spaceKey.wasPressedThisFrame || kb.enterKey.wasPressedThisFrame)) confirmKey = true;
-#else
-        if (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Return)) confirmKey = true;
-#endif
-        if (confirmKey)
-        {
-            ConfirmPosition();
+            trajectory.ShowLine();
         }
     }
 
-    private void HandleMouseDragging()
+    public void UpdateUIState()
     {
-        Vector3 mouseWorld = GetMouseWorldPosition();
-        bool isMouseDown = false;
-        bool isMouseUp = false;
-
-#if ENABLE_INPUT_SYSTEM
-        var mouse = Mouse.current;
-        if (mouse != null)
+        if (readyButton != null)
         {
-            isMouseDown = mouse.leftButton.wasPressedThisFrame;
-            isMouseUp = mouse.leftButton.wasReleasedThisFrame;
+            readyButton.interactable = isRepositionMode;
         }
-#else
-        isMouseDown = Input.GetMouseButtonDown(0);
-        isMouseUp = Input.GetMouseButtonUp(0);
-#endif
 
-        if (isMouseDown)
+        if (lockButton != null)
         {
-            if (UnityEngine.EventSystems.EventSystem.current != null &&
-                UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject())
-            {
-                return;
-            }
+            lockButton.interactable = isRepositionMode || isMyTurn;
+        }
 
-            Collider2D col = GetComponent<Collider2D>();
-            if (col != null && col.OverlapPoint(mouseWorld))
+        if (lockButtonText != null)
+        {
+            lockButtonText.color = Color.black;
+            if (isRepositionMode)
+            {
+                lockButtonText.text = "READY";
+            }
+            else
+            {
+                lockButtonText.text = isAimLocked ? "UNLOCK" : "LOCK";
+            }
+        }
+
+        if (throwButton != null)
+        {
+            throwButton.interactable = isMyTurn && isAimLocked && !isRepositionMode;
+        }
+    }
+
+    // =========================================================================
+    // การเคลื่อนที่ / วางตำแหน่ง
+    // =========================================================================
+    private void HandleRepositionInput()
+    {
+        transform.position = new Vector3(transform.position.x, groundFixedY, transform.position.z);
+
+        float horizontal = Input.GetAxisRaw("Horizontal");
+        if (Mathf.Abs(horizontal) > 0.05f)
+        {
+            float newX = transform.position.x + (horizontal * moveSpeed * Time.deltaTime);
+            newX = Mathf.Clamp(newX, minX, maxX);
+            transform.position = new Vector3(newX, groundFixedY, transform.position.z);
+
+            if (horizontal > 0)
+                transform.localScale = new Vector3(Mathf.Abs(transform.localScale.x), transform.localScale.y, transform.localScale.z);
+            else if (horizontal < 0)
+                transform.localScale = new Vector3(-Mathf.Abs(transform.localScale.x), transform.localScale.y, transform.localScale.z);
+        }
+
+        Vector3 mouseWorldPos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+        if (Input.GetMouseButtonDown(0))
+        {
+            if (playerCollider != null && playerCollider.OverlapPoint(mouseWorldPos))
             {
                 isDragging = true;
             }
         }
 
-        if (isMouseUp)
+        if (isDragging && Input.GetMouseButton(0))
+        {
+            float clampedX = Mathf.Clamp(mouseWorldPos.x, minX, maxX);
+            transform.position = new Vector3(clampedX, groundFixedY, transform.position.z);
+        }
+
+        if (Input.GetMouseButtonUp(0))
         {
             isDragging = false;
         }
 
-        if (isDragging)
+        if (Input.GetKeyDown(KeyCode.Space))
         {
-            float clampedX = Mathf.Clamp(mouseWorld.x, minX, maxX);
-            transform.position = new Vector3(clampedX, groundFixedY, transform.position.z);
+            ConfirmPosition();
         }
     }
 
@@ -184,6 +189,7 @@ public class PlayerController : MonoBehaviour
     public void ConfirmPosition()
     {
         isDragging = false;
+
         var soloManager = FindAnyObjectByType<TurnManager>();
         if (soloManager != null)
         {
@@ -198,56 +204,43 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    private void HandleAimInput()
+    // =========================================================================
+    // การเล็งและยิง (พร้อมแสดงเส้นชิ่งเด้ง Trajectory Preview)
+    // =========================================================================
+    private void HandleAimingInput()
     {
-        bool lockTogglePressed = false;
-        bool spacePressed = false;
-        bool cancelUnlockPressed = false;
-
-#if ENABLE_INPUT_SYSTEM
-        var mouse = Mouse.current;
-        var keyboard = Keyboard.current;
-
-        if (keyboard != null && keyboard.spaceKey.wasPressedThisFrame) spacePressed = true;
-        if (mouse != null && mouse.rightButton.wasPressedThisFrame) lockTogglePressed = true;
-
-        if (keyboard != null && (keyboard.escapeKey.wasPressedThisFrame || keyboard.deleteKey.wasPressedThisFrame))
+        if (!isAimLocked)
         {
-            cancelUnlockPressed = true;
-        }
-        if (mouse != null && mouse.leftButton.wasPressedThisFrame)
-        {
-            cancelUnlockPressed = true;
-        }
-#else
-        if (Input.GetKeyDown(KeyCode.Space)) spacePressed = true;
-        if (Input.GetMouseButtonDown(1)) lockTogglePressed = true;
+            Vector3 mousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+            Vector2 aimVector = (Vector2)(mousePos - throwPoint.position);
+            float dist = aimVector.magnitude;
+            Vector2 launchDirection = aimVector.normalized;
 
-        if (Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.Delete) || Input.GetMouseButtonDown(0))
-        {
-            cancelUnlockPressed = true;
-        }
-#endif
+            float speed = Mathf.Clamp(dist * forceSensitivity, minLaunchForce, maxLaunchForce);
+            currentLaunchVelocity = launchDirection * speed;
 
-        if (isAimLocked && cancelUnlockPressed)
-        {
-            if (UnityEngine.EventSystems.EventSystem.current == null ||
-                !UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject())
+            // วาดเส้นสะท้อนด้วย TrajectoryLine
+            if (trajectory != null)
+            {
+                trajectory.ShowLine();
+                trajectory.DrawBounceTrajectory(throwPoint.position, currentLaunchVelocity, playerCollider);
+            }
+
+            if (Input.GetKeyDown(KeyCode.Space) || Input.GetMouseButtonDown(1))
             {
                 ToggleLockAim();
-                return;
             }
         }
-
-        if (lockTogglePressed)
+        else
         {
-            ToggleLockAim();
-        }
-
-        if (spacePressed)
-        {
-            if (!isAimLocked) ToggleLockAim();
-            else Throw();
+            if (Input.GetKeyDown(KeyCode.Space) || Input.GetMouseButtonDown(0))
+            {
+                Throw();
+            }
+            else if (Input.GetMouseButtonDown(1))
+            {
+                ToggleLockAim();
+            }
         }
     }
 
@@ -257,61 +250,29 @@ public class PlayerController : MonoBehaviour
 
         isAimLocked = !isAimLocked;
         UpdateUIState();
-    }
-
-    private void UpdateAim()
-    {
-        Vector3 mouseWorldPos = GetMouseWorldPosition();
-
-        if (mouseWorldPos.x < transform.position.x)
-        {
-            transform.localScale = new Vector3(-Mathf.Abs(transform.localScale.x), transform.localScale.y, transform.localScale.z);
-        }
-        else
-        {
-            transform.localScale = new Vector3(Mathf.Abs(transform.localScale.x), transform.localScale.y, transform.localScale.z);
-        }
-
-        Vector2 startPos = throwPoint.position;
-        Vector2 targetPos = mouseWorldPos;
-
-        currentVelocity = CalculateVelocityToTarget(startPos, targetPos, arcHeight, out flightTime);
 
         if (trajectory != null)
         {
-            trajectory.DrawTrajectoryToTarget(startPos, currentVelocity, flightTime);
-        }
-    }
-
-    private Vector2 CalculateVelocityToTarget(Vector2 start, Vector2 target, float extraHeight, out float totalTime)
-    {
-        float gravity = Mathf.Abs(Physics2D.gravity.y);
-        float apexY = Mathf.Max(start.y, target.y) + extraHeight;
-
-        float vy = Mathf.Sqrt(2f * gravity * Mathf.Max(0.1f, apexY - start.y));
-        float timeUp = vy / gravity;
-        float timeDown = Mathf.Sqrt(2f * Mathf.Max(0.01f, apexY - target.y) / gravity);
-        totalTime = Mathf.Max(0.05f, timeUp + timeDown);
-
-        float vx = (target.x - start.x) / totalTime;
-        return new Vector2(vx, vy);
-    }
-
-    public void StartPlayerTurn()
-    {
-        isMyTurn = true;
-        isAimLocked = false;
-        UpdateUIState();
-
-        if (trajectory != null)
-        {
-            trajectory.ShowLine();
+            if (isAimLocked)
+            {
+                trajectory.DrawBounceTrajectory(throwPoint.position, currentLaunchVelocity, playerCollider);
+            }
+            else
+            {
+                trajectory.ShowLine();
+            }
         }
     }
 
     public void Throw()
     {
-        if (!isMyTurn || !isAimLocked) return;
+        if (!isMyTurn || isRepositionMode) return;
+
+        if (projectilePrefab == null || throwPoint == null)
+        {
+            Debug.LogWarning("ยังไม่ได้ใส่ Projectile Prefab หรือ ThrowPoint!");
+            return;
+        }
 
         isMyTurn = false;
         isAimLocked = false;
@@ -322,71 +283,32 @@ public class PlayerController : MonoBehaviour
             trajectory.HideLine();
         }
 
-        GameObject obj = Instantiate(projectilePrefab, throwPoint.position, Quaternion.identity);
-        obj.tag = "Projectile";
+        GameObject proj = Instantiate(projectilePrefab, throwPoint.position, Quaternion.identity);
+        proj.tag = "Projectile";
 
-        Collider2D playerCol = GetComponent<Collider2D>();
-        Collider2D projCol = obj.GetComponent<Collider2D>();
-        if (playerCol != null && projCol != null)
+        Collider2D projCol = proj.GetComponent<Collider2D>();
+        if (playerCollider != null && projCol != null)
         {
-            Physics2D.IgnoreCollision(playerCol, projCol);
+            Physics2D.IgnoreCollision(playerCollider, projCol);
         }
 
-        Rigidbody2D rb = obj.GetComponent<Rigidbody2D>();
+        Rigidbody2D rb = proj.GetComponent<Rigidbody2D>();
         if (rb != null)
         {
-            rb.linearVelocity = currentVelocity;
+            rb.linearVelocity = currentLaunchVelocity;
         }
 
-        // แจ้ง TurnManager (รองรับทั้งโหมดเดิมและโหมด PvP)
+        var soloManager = FindAnyObjectByType<TurnManager>();
+        if (soloManager != null)
+        {
+            soloManager.OnItemThrown(true);
+            return;
+        }
+
         var pvpManager = FindAnyObjectByType<TurnManagerPvP>();
         if (pvpManager != null)
         {
             pvpManager.OnItemThrown(playerIndex);
-        }
-        else
-        {
-            FindAnyObjectByType<TurnManager>()?.OnItemThrown(true);
-        }
-    }
-
-    private Vector3 GetMouseWorldPosition()
-    {
-        Vector3 mouseScreen;
-#if ENABLE_INPUT_SYSTEM
-        mouseScreen = Mouse.current != null ? (Vector3)Mouse.current.position.ReadValue() : Input.mousePosition;
-#else
-        mouseScreen = Input.mousePosition;
-#endif
-        Vector3 world = Camera.main.ScreenToWorldPoint(mouseScreen);
-        world.z = 0f;
-        return world;
-    }
-
-    public void UpdateUIState()
-    {
-        if (lockButton != null)
-        {
-            lockButton.interactable = isRepositionMode || isMyTurn;
-        }
-
-        if (lockButtonText != null)
-        {
-            lockButtonText.color = Color.black;
-
-            if (isRepositionMode)
-            {
-                lockButtonText.text = "READY";
-            }
-            else
-            {
-                lockButtonText.text = isAimLocked ? "UNLOCK" : "LOCK";
-            }
-        }
-
-        if (throwButton != null)
-        {
-            throwButton.interactable = isMyTurn && isAimLocked && !isRepositionMode;
         }
     }
 }

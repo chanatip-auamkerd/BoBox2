@@ -289,19 +289,22 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerController
   playerIndex: 1
+  isMyTurn: 1
+  isRepositionMode: 0
+  isAimLocked: 0
+  moveSpeed: 5
+  minX: -8
+  maxX: -1.5
   throwPoint: {fileID: 216114591}
   projectilePrefab: {fileID: 5446764187174795195, guid: f7030cd56e4f0604bb06d7ce5ebca3e1, type: 3}
   trajectory: {fileID: 1473814123}
+  minLaunchForce: 6
+  maxLaunchForce: 22
+  forceSensitivity: 2.5
+  readyButton: {fileID: 0}
   lockButton: {fileID: 1039646363}
   lockButtonText: {fileID: 669177984}
   throwButton: {fileID: 1779175567}
-  isMyTurn: 1
-  isAimLocked: 0
-  isRepositionMode: 0
-  keyboardMoveSpeed: 6
-  minX: -8
-  maxX: -1.5
-  arcHeight: 3.5
 --- !u!114 &266878731
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -588,18 +591,18 @@ MonoBehaviour:
   - {fileID: 120130289285667386, guid: b22db6a467cfa8a459ad9402ed727b3b, type: 3}
   - {fileID: 2973986946535447071, guid: 5a85bbbd651426c4b8f9d1ac3fbe5b57, type: 3}
   - {fileID: 9195216593254782832, guid: 3b04f7064b25d7a4c84b33714cba7990, type: 3}
-  minProps: 5
-  maxProps: 9
-  minX: -7.91
-  maxX: 7.91
-  minY: -0.58
-  maxY: 3.8
-  minDistanceBetweenProps: 1.2
-  maxPlacementAttempts: 35
+  minProps: 8
+  maxProps: 14
+  minX: -7.98
+  maxX: 8.01
+  minY: -0.56
+  maxY: 4.07
+  minDistanceBetweenProps: 0.85
+  maxPlacementAttempts: 60
   randomRotation: 1
   minAngle: -45
   maxAngle: 45
-  scaleRange: {x: 0.8, y: 1.25}
+  scaleRange: {x: 0.7, y: 1.05}
 --- !u!4 &403473493
 Transform:
   m_ObjectHideFlags: 0
@@ -858,10 +861,8 @@ MonoBehaviour:
   maxX: 8
   moveSpeed: 4
   aimPreviewDuration: 2
-  trickshotChance: 0.8
-  maxArcHeight: 2
-  maxLaunchSpeed: 15
-  aimOffsetSpread: 0.6
+  minLaunchForce: 8
+  maxLaunchForce: 22
 --- !u!4 &657254243
 Transform:
   m_ObjectHideFlags: 0
@@ -1264,8 +1265,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0bb12a6ec6ab1f242a31959490aba853, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TrajectoryLine
-  resolution: 30
+  maxBouncesToPreview: 1
   timeStep: 0.05
+  maxSimulationDuration: 2.5
+  collisionMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
 --- !u!120 &792846484
 LineRenderer:
   serializedVersion: 3
@@ -1969,7 +1974,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 1, y: 0}
   m_AnchorMax: {x: 1, y: 0}
-  m_AnchoredPosition: {x: -358, y: 91}
+  m_AnchoredPosition: {x: -1056, y: 60}
   m_SizeDelta: {x: 182.09, y: 87.4}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1039646363
@@ -2284,8 +2289,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0bb12a6ec6ab1f242a31959490aba853, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TrajectoryLine
-  resolution: 30
+  maxBouncesToPreview: 1
   timeStep: 0.05
+  maxSimulationDuration: 2.5
+  collisionMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
 --- !u!120 &1473814124
 LineRenderer:
   serializedVersion: 3
@@ -2676,7 +2685,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 1, y: 0}
   m_AnchorMax: {x: 1, y: 0}
-  m_AnchoredPosition: {x: -144, y: 91}
+  m_AnchoredPosition: {x: -853, y: 58}
   m_SizeDelta: {x: 182.09, y: 87.4}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1779175567

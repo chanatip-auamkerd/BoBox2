@@ -1,67 +1,95 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 [RequireComponent(typeof(LineRenderer))]
 public class TrajectoryLine : MonoBehaviour
 {
-    private LineRenderer lineRenderer;
+    private LineRenderer lr;
 
-    [Header("Trajectory Settings")]
-    [SerializeField] private int resolution = 30;
-    [SerializeField] private float timeStep = 0.05f;
+    [Header("Simulation Settings")]
+    [Tooltip("จำนวนครั้งการสะท้อนที่จะแสดงในเส้นเล็ง (เช่น 1 = สะท้อนครั้งแรก, 2 = ชิ่ง 2 ทอด)")]
+    public int maxBouncesToPreview = 1;
+
+    [Tooltip("ความละเอียดของเส้น (ค่ายิ่งน้อย เส้นยิ่งโค้งเนียน)")]
+    public float timeStep = 0.03f;
+
+    [Tooltip("ระยะเวลาการบินจำลองสูงสุด")]
+    public float maxSimulationDuration = 2.5f;
+
+    [Header("Collision Layers")]
+    [Tooltip("Layer ของวัตถุที่ให้เส้นเล็งสะท้อน (ปกติเลือก Default)")]
+    public LayerMask collisionMask = ~0; 
 
     void Awake()
     {
-        lineRenderer = GetComponent<LineRenderer>();
+        lr = GetComponent<LineRenderer>();
     }
-
-    public void DrawTrajectoryToTarget(Vector2 startPos, Vector2 initialVelocity, float totalTime)
+    public void DrawBounceTrajectory(Vector2 startPos, Vector2 initialVelocity, Collider2D shooterCollider = null)
     {
-        if (lineRenderer == null) lineRenderer = GetComponent<LineRenderer>();
+        if (lr == null) lr = GetComponent<LineRenderer>();
 
-        lineRenderer.enabled = true;
-        lineRenderer.positionCount = resolution;
+        List<Vector3> points = new List<Vector3>();
+        points.Add(startPos);
 
-        Vector2 gravity = Physics2D.gravity;
-        float step = totalTime / Mathf.Max(1, resolution - 1);
-
-        for (int i = 0; i < resolution; i++)
-        {
-            float t = i * step;
-            Vector2 point = startPos + (initialVelocity * t) + (0.5f * gravity * t * t);
-            lineRenderer.SetPosition(i, new Vector3(point.x, point.y, 0f));
-        }
-    }
-
-    public void DrawTrajectory(Vector2 startPos, Vector2 initialVelocity)
-    {
-        if (lineRenderer == null) lineRenderer = GetComponent<LineRenderer>();
-
-        lineRenderer.enabled = true;
-        lineRenderer.positionCount = resolution;
-
+        Vector2 currentPos = startPos;
+        Vector2 currentVel = initialVelocity;
         Vector2 gravity = Physics2D.gravity;
 
-        for (int i = 0; i < resolution; i++)
+        int bounceCount = 0;
+        float elapsed = 0f;
+
+        while (elapsed < maxSimulationDuration)
         {
-            float t = i * timeStep;
-            Vector2 point = startPos + (initialVelocity * t) + (0.5f * gravity * t * t);
-            lineRenderer.SetPosition(i, new Vector3(point.x, point.y, 0f));
+            elapsed += timeStep;
+
+            Vector2 nextPos = currentPos + (currentVel * timeStep) + (0.5f * gravity * timeStep * timeStep);
+            currentVel += gravity * timeStep;
+
+            RaycastHit2D hit = Physics2D.Linecast(currentPos, nextPos, collisionMask);
+
+            if (hit.collider != null && hit.collider != shooterCollider)
+            {
+                points.Add(hit.point);
+
+                if (hit.collider.CompareTag("Prop") && bounceCount < maxBouncesToPreview)
+                {
+                    bounceCount++;
+
+                    currentVel = Vector2.Reflect(currentVel, hit.normal) * 0.95f;
+
+                    currentPos = hit.point + (hit.normal * 0.05f);
+                    points.Add(currentPos);
+                    continue;
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+            points.Add(nextPos);
+            currentPos = nextPos;
         }
+
+        lr.positionCount = points.Count;
+        lr.SetPositions(points.ToArray());
     }
-
-    public void HideLine()
+    public void DrawTrajectoryToTarget(Vector2 startPos, Vector2 velocity, float totalTime)
     {
-        if (lineRenderer == null) lineRenderer = GetComponent<LineRenderer>();
-
-        lineRenderer.positionCount = 0;
-        lineRenderer.enabled = false;
-        gameObject.SetActive(false); 
+        DrawBounceTrajectory(startPos, velocity);
     }
 
     public void ShowLine()
     {
-        gameObject.SetActive(true);
-        if (lineRenderer == null) lineRenderer = GetComponent<LineRenderer>();
-        lineRenderer.enabled = true;
+        if (lr != null) lr.enabled = true;
+    }
+
+    public void HideLine()
+    {
+        if (lr != null)
+        {
+            lr.positionCount = 0;
+            lr.enabled = false;
+        }
     }
 }
