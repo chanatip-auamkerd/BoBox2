@@ -1,43 +1,34 @@
 using System;
-using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
 public class PlayerController : MonoBehaviour
 {
-    [Header("Player Settings")]
-    [Tooltip("1 = Player 1 / 2 = Player 2")]
-    public int playerIndex = 1;
+    public event Action OnThrowAnimationRequested;
 
+    [Header("Player Settings")]
+    [Tooltip("1 สำหรับ Player 1 (ฟ้า), 2 สำหรับ Player 2 (แดง/ผี)")]
+    public int playerIndex = 1;
     public bool isMyTurn = false;
     public bool isRepositionMode = false;
     public bool isAimLocked = false;
 
-    // =========================================================
-    // Animation Bridge
-    // =========================================================
-
-    /// <summary>
-    /// แจ้ง PlayerAnimationController ว่าผู้เล่นกด THROW แล้ว
-    /// </summary>
-    public event Action OnThrowAnimationRequested;
-
-    // =========================================================
-    // Movement
-    // =========================================================
+    [Header("Visual Sprites & Facing")]
+    [Tooltip("ใส่รูปท่ายืนนิ่ง/เดิน")]
+    public Sprite idleSprite;
+    [Tooltip("ใส่รูปท่ายกมือเตรียมปา")]
+    public Sprite throwSprite;
+    [Tooltip("ติ๊กถูกถ้าภาพวาดต้นฉบับหันหน้าไปทางซ้าย (เช่น ตัวผี Player2)")]
+    public bool defaultFacingLeft = false;
+    private SpriteRenderer spriteRenderer;
 
     [Header("Movement & Boundaries")]
     public float moveSpeed = 5f;
     public float minX = -7.5f;
     public float maxX = -1.5f;
-
     private float groundFixedY;
     private bool isDragging = false;
-
-    // =========================================================
-    // Aim / Throw
-    // =========================================================
 
     [Header("Aiming & Throw Settings")]
     public Transform throwPoint;
@@ -48,12 +39,11 @@ public class PlayerController : MonoBehaviour
     public float maxLaunchForce = 22f;
     public float forceSensitivity = 2.5f;
 
-    [Tooltip("เวลาหน่วงก่อนสร้างลูกบอล เพื่อให้ท่า THROW ได้เริ่มเล่นก่อน")]
-    public float throwDelay = 0.18f;
-
-    // =========================================================
-    // UI
-    // =========================================================
+    [Header("Throw Point Offsets")]
+    [Tooltip("ตำแหน่งปล่อยบอลตอนท่ายืนนิ่ง")]
+    public Vector2 idleThrowOffset = new Vector2(0.4f, 0.4f);
+    [Tooltip("ตำแหน่งปล่อยบอลตอนท่าเตรียมปา (ตรงมือที่ยื่นออกไป)")]
+    public Vector2 actionThrowOffset = new Vector2(0.6f, 0.5f);
 
     [Header("UI Buttons")]
     public Button readyButton;
@@ -61,77 +51,66 @@ public class PlayerController : MonoBehaviour
     public TextMeshProUGUI lockButtonText;
     public Button throwButton;
 
-    // =========================================================
-    // Runtime
-    // =========================================================
-
     private Vector2 currentLaunchVelocity;
     private Collider2D playerCollider;
-    private bool throwInProgress = false;
 
-    // =========================================================
-    // Unity
-    // =========================================================
-
-    private void Awake()
+    void Awake()
     {
         groundFixedY = transform.position.y;
         playerCollider = GetComponent<Collider2D>();
+        spriteRenderer = GetComponent<SpriteRenderer>();
     }
 
-    private void Start()
+    void Start()
     {
-        if (readyButton != null)
-            readyButton.onClick.AddListener(ConfirmPosition);
-
-        if (lockButton != null)
-            lockButton.onClick.AddListener(OnActionButtonClicked);
-
-        if (throwButton != null)
-            throwButton.onClick.AddListener(Throw);
-
+        if (readyButton != null) readyButton.onClick.AddListener(ConfirmPosition);
+        if (lockButton != null) lockButton.onClick.AddListener(OnActionButtonClicked);
+        if (throwButton != null) throwButton.onClick.AddListener(Throw);
+        SetVisualPose(false);
         UpdateUIState();
     }
 
-    private void Update()
+    void Update()
     {
-        if (throwInProgress)
-            return;
-
         if (isRepositionMode)
         {
             HandleRepositionInput();
             return;
         }
 
-        if (!isMyTurn)
-            return;
+        if (!isMyTurn) return;
 
         HandleAimingInput();
     }
+    public void SetVisualPose(bool isThrowPose)
+    {
+        if (spriteRenderer == null) spriteRenderer = GetComponent<SpriteRenderer>();
 
-    // =========================================================
-    // TurnManager / TurnManagerPvP API
-    // =========================================================
+        if (isThrowPose && throwSprite != null)
+        {
+            spriteRenderer.sprite = throwSprite;
+            if (throwPoint != null) throwPoint.localPosition = actionThrowOffset;
+        }
+        else if (idleSprite != null)
+        {
+            spriteRenderer.sprite = idleSprite;
+            if (throwPoint != null) throwPoint.localPosition = idleThrowOffset;
+        }
+    }
 
     public void EnableRepositionMode(bool enable)
     {
         isRepositionMode = enable;
         isDragging = false;
 
-        transform.position = new Vector3(
-            Mathf.Clamp(transform.position.x, minX, maxX),
-            groundFixedY,
-            transform.position.z
-        );
+        transform.position = new Vector3(Mathf.Clamp(transform.position.x, minX, maxX), groundFixedY, transform.position.z);
 
         if (enable)
         {
             isMyTurn = false;
             isAimLocked = false;
-
-            if (trajectory != null)
-                trajectory.HideLine();
+            SetVisualPose(false);
+            if (trajectory != null) trajectory.HideLine();
         }
 
         UpdateUIState();
@@ -142,80 +121,55 @@ public class PlayerController : MonoBehaviour
         isMyTurn = true;
         isAimLocked = false;
         isRepositionMode = false;
-        throwInProgress = false;
 
+        SetVisualPose(false);
         UpdateUIState();
 
         if (trajectory != null)
+        {
             trajectory.ShowLine();
+        }
     }
 
     public void UpdateUIState()
     {
-        if (readyButton != null)
-            readyButton.interactable = isRepositionMode;
-
-        if (lockButton != null)
-            lockButton.interactable = isRepositionMode || isMyTurn;
+        if (readyButton != null) readyButton.interactable = isRepositionMode;
+        if (lockButton != null) lockButton.interactable = isRepositionMode || isMyTurn;
 
         if (lockButtonText != null)
         {
             lockButtonText.color = Color.black;
-            lockButtonText.text = isRepositionMode
-                ? "READY"
-                : (isAimLocked ? "UNLOCK" : "LOCK");
+            if (isRepositionMode) lockButtonText.text = "READY";
+            else lockButtonText.text = isAimLocked ? "UNLOCK" : "LOCK";
         }
 
         if (throwButton != null)
         {
-            throwButton.interactable =
-                isMyTurn &&
-                isAimLocked &&
-                !isRepositionMode &&
-                !throwInProgress;
+            throwButton.interactable = isMyTurn && isAimLocked && !isRepositionMode;
         }
     }
-
-    // =========================================================
-    // Reposition
-    // =========================================================
-
     private void HandleRepositionInput()
     {
-        transform.position = new Vector3(
-            transform.position.x,
-            groundFixedY,
-            transform.position.z
-        );
+        transform.position = new Vector3(transform.position.x, groundFixedY, transform.position.z);
 
         float horizontal = Input.GetAxisRaw("Horizontal");
-
         if (Mathf.Abs(horizontal) > 0.05f)
         {
-            float newX = transform.position.x +
-                         horizontal * moveSpeed * Time.deltaTime;
-
+            float newX = transform.position.x + (horizontal * moveSpeed * Time.deltaTime);
             newX = Mathf.Clamp(newX, minX, maxX);
+            transform.position = new Vector3(newX, groundFixedY, transform.position.z);
 
-            transform.position = new Vector3(
-                newX,
-                groundFixedY,
-                transform.position.z
-            );
-
-            FlipFromInput(horizontal);
+            float facingSign = defaultFacingLeft ? -1f : 1f;
+            if (horizontal > 0)
+                transform.localScale = new Vector3(facingSign * Mathf.Abs(transform.localScale.x), transform.localScale.y, transform.localScale.z);
+            else if (horizontal < 0)
+                transform.localScale = new Vector3(-facingSign * Mathf.Abs(transform.localScale.x), transform.localScale.y, transform.localScale.z);
         }
 
-        if (Camera.main == null)
-            return;
-
-        Vector3 mouseWorldPos =
-            Camera.main.ScreenToWorldPoint(Input.mousePosition);
-
+        Vector3 mouseWorldPos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
         if (Input.GetMouseButtonDown(0))
         {
-            if (playerCollider != null &&
-                playerCollider.OverlapPoint(mouseWorldPos))
+            if (playerCollider != null && playerCollider.OverlapPoint(mouseWorldPos))
             {
                 isDragging = true;
             }
@@ -224,128 +178,77 @@ public class PlayerController : MonoBehaviour
         if (isDragging && Input.GetMouseButton(0))
         {
             float clampedX = Mathf.Clamp(mouseWorldPos.x, minX, maxX);
+            float prevX = transform.position.x;
+            transform.position = new Vector3(clampedX, groundFixedY, transform.position.z);
 
-            transform.position = new Vector3(
-                clampedX,
-                groundFixedY,
-                transform.position.z
-            );
+            float dragDir = clampedX - prevX;
+            float facingSign = defaultFacingLeft ? -1f : 1f;
+            if (dragDir > 0.01f)
+                transform.localScale = new Vector3(facingSign * Mathf.Abs(transform.localScale.x), transform.localScale.y, transform.localScale.z);
+            else if (dragDir < -0.01f)
+                transform.localScale = new Vector3(-facingSign * Mathf.Abs(transform.localScale.x), transform.localScale.y, transform.localScale.z);
         }
 
         if (Input.GetMouseButtonUp(0))
+        {
             isDragging = false;
+        }
 
         if (Input.GetKeyDown(KeyCode.Space))
+        {
             ConfirmPosition();
-    }
-
-    private void FlipFromInput(float horizontal)
-    {
-        if (horizontal > 0f)
-        {
-            transform.localScale = new Vector3(
-                Mathf.Abs(transform.localScale.x),
-                transform.localScale.y,
-                transform.localScale.z
-            );
-        }
-        else if (horizontal < 0f)
-        {
-            transform.localScale = new Vector3(
-                -Mathf.Abs(transform.localScale.x),
-                transform.localScale.y,
-                transform.localScale.z
-            );
         }
     }
-
-    // =========================================================
-    // READY / LOCK
-    // =========================================================
 
     public void OnActionButtonClicked()
     {
-        if (isRepositionMode)
-        {
-            ConfirmPosition();
-        }
-        else if (isMyTurn)
-        {
-            ToggleLockAim();
-        }
+        if (isRepositionMode) ConfirmPosition();
+        else if (isMyTurn) ToggleLockAim();
     }
 
     public void ConfirmPosition()
     {
         isDragging = false;
 
-        TurnManager soloManager =
-            FindAnyObjectByType<TurnManager>();
-
+        var soloManager = FindAnyObjectByType<TurnManager>();
         if (soloManager != null)
         {
             soloManager.ConfirmRepositionEarly();
             return;
         }
 
-        TurnManagerPvP pvpManager =
-            FindAnyObjectByType<TurnManagerPvP>();
-
+        var pvpManager = FindAnyObjectByType<TurnManagerPvP>();
         if (pvpManager != null)
+        {
             pvpManager.ConfirmRepositionEarly();
+        }
     }
-
-    // =========================================================
-    // Aiming
-    // =========================================================
-
     private void HandleAimingInput()
     {
         if (!isAimLocked)
         {
-            if (Camera.main == null || throwPoint == null)
-                return;
-
-            Vector3 mousePos =
-                Camera.main.ScreenToWorldPoint(Input.mousePosition);
-
-            Vector2 aimVector =
-                (Vector2)(mousePos - throwPoint.position);
-
+            Vector3 mousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+            Vector2 aimVector = (Vector2)(mousePos - throwPoint.position);
             float dist = aimVector.magnitude;
+            Vector2 launchDirection = aimVector.normalized;
 
-            Vector2 launchDirection = dist > 0.001f
-                ? aimVector.normalized
-                : Vector2.right;
-
-            float speed = Mathf.Clamp(
-                dist * forceSensitivity,
-                minLaunchForce,
-                maxLaunchForce
-            );
-
+            float speed = Mathf.Clamp(dist * forceSensitivity, minLaunchForce, maxLaunchForce);
             currentLaunchVelocity = launchDirection * speed;
 
             if (trajectory != null)
             {
                 trajectory.ShowLine();
-                trajectory.DrawBounceTrajectory(
-                    throwPoint.position,
-                    currentLaunchVelocity,
-                    playerCollider
-                );
+                trajectory.DrawBounceTrajectory(throwPoint.position, currentLaunchVelocity, playerCollider);
             }
 
-            if (Input.GetKeyDown(KeyCode.Space) ||
-                Input.GetMouseButtonDown(1))
+            if (Input.GetKeyDown(KeyCode.Space) || Input.GetMouseButtonDown(1))
             {
                 ToggleLockAim();
             }
         }
         else
         {
-            if (Input.GetKeyDown(KeyCode.Space) ||
-                Input.GetMouseButtonDown(0))
+            if (Input.GetKeyDown(KeyCode.Space) || Input.GetMouseButtonDown(0))
             {
                 Throw();
             }
@@ -358,21 +261,17 @@ public class PlayerController : MonoBehaviour
 
     public void ToggleLockAim()
     {
-        if (!isMyTurn || isRepositionMode || throwInProgress)
-            return;
+        if (!isMyTurn || isRepositionMode) return;
 
         isAimLocked = !isAimLocked;
+        SetVisualPose(isAimLocked);
         UpdateUIState();
 
         if (trajectory != null)
         {
             if (isAimLocked)
             {
-                trajectory.DrawBounceTrajectory(
-                    throwPoint.position,
-                    currentLaunchVelocity,
-                    playerCollider
-                );
+                trajectory.DrawBounceTrajectory(throwPoint.position, currentLaunchVelocity, playerCollider);
             }
             else
             {
@@ -381,93 +280,52 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    // =========================================================
-    // THROW
-    // =========================================================
-
     public void Throw()
     {
-        if (!isMyTurn || isRepositionMode || throwInProgress)
-            return;
+        if (!isMyTurn || isRepositionMode) return;
 
         if (projectilePrefab == null || throwPoint == null)
         {
-            Debug.LogWarning(
-                "PlayerController: ยังไม่ได้ใส่ Projectile Prefab หรือ ThrowPoint!"
-            );
+            Debug.LogWarning("⚠️ ยังใส่ References ไม่ครบใน Inspector!");
             return;
         }
 
-        throwInProgress = true;
-        isMyTurn = false;
-        isAimLocked = false;
-
-        UpdateUIState();
-
-        if (trajectory != null)
-            trajectory.HideLine();
-
-        // บอก Animation Script ให้เปลี่ยนเป็นท่า THROW
         OnThrowAnimationRequested?.Invoke();
 
-        StartCoroutine(ReleaseProjectileRoutine());
-    }
+        isMyTurn = false;
+        isAimLocked = false;
+        UpdateUIState();
 
-    private IEnumerator ReleaseProjectileRoutine()
-    {
-        yield return new WaitForSeconds(Mathf.Max(0f, throwDelay));
+        if (trajectory != null) trajectory.HideLine();
 
-        ReleaseProjectileFromAnimation();
-    }
-
-    /// <summary>
-    /// จุดที่สร้าง Projectile จริง
-    /// Animation Controller ไม่ได้สร้างบอลเอง เพื่อรักษา separation
-    /// ระหว่าง Visual กับ Gameplay
-    /// </summary>
-    public void ReleaseProjectileFromAnimation()
-    {
-        if (!throwInProgress)
-            return;
-
-        GameObject proj = Instantiate(
-            projectilePrefab,
-            throwPoint.position,
-            Quaternion.identity
-        );
-
+        GameObject proj = Instantiate(projectilePrefab, throwPoint.position, Quaternion.identity);
         proj.tag = "Projectile";
 
         Collider2D projCol = proj.GetComponent<Collider2D>();
-
         if (playerCollider != null && projCol != null)
         {
-            Physics2D.IgnoreCollision(
-                playerCollider,
-                projCol
-            );
+            Physics2D.IgnoreCollision(playerCollider, projCol);
         }
 
         Rigidbody2D rb = proj.GetComponent<Rigidbody2D>();
-
         if (rb != null)
+        {
             rb.linearVelocity = currentLaunchVelocity;
+        }
 
-        throwInProgress = false;
+        SetVisualPose(false);
 
-        TurnManager soloManager =
-            FindAnyObjectByType<TurnManager>();
-
+        var soloManager = FindAnyObjectByType<TurnManager>();
         if (soloManager != null)
         {
             soloManager.OnItemThrown(true);
             return;
         }
 
-        TurnManagerPvP pvpManager =
-            FindAnyObjectByType<TurnManagerPvP>();
-
+        var pvpManager = FindAnyObjectByType<TurnManagerPvP>();
         if (pvpManager != null)
+        {
             pvpManager.OnItemThrown(playerIndex);
+        }
     }
 }
