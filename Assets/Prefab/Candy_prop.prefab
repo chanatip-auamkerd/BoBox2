@@ -10,12 +10,10 @@ GameObject:
   m_Component:
   - component: {fileID: 8153761909879136906}
   - component: {fileID: 5784499458651221120}
-  - component: {fileID: 7127904881263884764}
-  - component: {fileID: 6612077120030563558}
   - component: {fileID: 4600848284056369667}
   m_Layer: 0
-  m_Name: Bone_Projectile
-  m_TagString: Projectile
+  m_Name: Candy_prop
+  m_TagString: Prop
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -94,49 +92,6 @@ SpriteRenderer:
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
---- !u!50 &7127904881263884764
-Rigidbody2D:
-  serializedVersion: 5
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5446764187174795195}
-  m_BodyType: 0
-  m_Simulated: 1
-  m_UseFullKinematicContacts: 0
-  m_UseAutoMass: 0
-  m_Mass: 1
-  m_LinearDamping: 0
-  m_AngularDamping: 0.05
-  m_GravityScale: 1
-  m_Material: {fileID: 6200000, guid: 6b54c7ba793272d4fb7fd6cc26fe84b1, type: 2}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_Interpolate: 0
-  m_SleepingMode: 1
-  m_CollisionDetection: 0
-  m_Constraints: 0
---- !u!114 &6612077120030563558
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5446764187174795195}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b32ec42a9de4dc545872f746e0b20757, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ThrowableItem
-  baseDamage: 20
-  bonusDamagePerBounce: 5
-  maxGroundHits: 2
-  maxLifeTime: 6
 --- !u!60 &4600848284056369667
 PolygonCollider2D:
   m_ObjectHideFlags: 0
