@@ -130,6 +130,7 @@ public class BotController : MonoBehaviour
 
         throwSafetyCoroutine = null;
     }
+
     private SmartShot FindBestPossibleShot()
     {
         SmartShot best = new SmartShot
@@ -177,6 +178,7 @@ public class BotController : MonoBehaviour
                 }
             }
         }
+
         if (best.score <= -500f)
         {
             best.standingX = 5.8f;
@@ -227,6 +229,7 @@ public class BotController : MonoBehaviour
 
         return best;
     }
+
     private float SimulateTrajectory(
         Vector2 startPos,
         Vector2 initialVelocity,
@@ -341,6 +344,7 @@ public class BotController : MonoBehaviour
         float vx = (target.x - start.x) / totalTime;
         return new Vector2(vx, vy);
     }
+
     public void ReleaseProjectileFromAnimation()
     {
         if (projectileAlreadyReleased)
@@ -361,13 +365,19 @@ public class BotController : MonoBehaviour
         );
 
         obj.tag = "Projectile";
+        ThrowableItem itemScript = obj.GetComponent<ThrowableItem>();
+        if (itemScript != null)
+        {
+            itemScript.SetThrower(this.gameObject);
+        }
 
         Collider2D botCol = GetComponent<Collider2D>();
         Collider2D projCol = obj.GetComponent<Collider2D>();
 
         if (botCol != null && projCol != null)
         {
-            Physics2D.IgnoreCollision(botCol, projCol);
+            Physics2D.IgnoreCollision(botCol, projCol, true);
+            StartCoroutine(ReEnableBotCollisionRoutine(botCol, projCol, 0.15f));
         }
 
         Rigidbody2D rb = obj.GetComponent<Rigidbody2D>();
@@ -377,5 +387,14 @@ public class BotController : MonoBehaviour
         }
 
         FindAnyObjectByType<TurnManager>()?.OnItemThrown(false);
+    }
+
+    private IEnumerator ReEnableBotCollisionRoutine(Collider2D botCollider, Collider2D projectileCollider, float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        if (botCollider != null && projectileCollider != null)
+        {
+            Physics2D.IgnoreCollision(botCollider, projectileCollider, false);
+        }
     }
 }

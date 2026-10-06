@@ -1,5 +1,6 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using TMPro;
 
 public class TurnManager : MonoBehaviour
@@ -13,24 +14,47 @@ public class TurnManager : MonoBehaviour
     public TextMeshProUGUI turnText;
 
     [Header("Phase Settings")]
-    public float repositionDuration = 10f; 
-    public float turnDuration = 15f;     
+    public float repositionDuration = 10f;
+    public float turnDuration = 15f;
 
-    public enum TurnState { RepositionPhase, PlayerTurn, BotTurn, WaitingForProjectile }
+    [Header("Game Over & Scene Settings")]
+    [Tooltip("ชื่อ Scene เมื่อผู้เล่นชนะบอท")]
+    public string winSceneName = "WinScene";
+
+    [Tooltip("ชื่อ Scene เมื่อผู้เล่นแพ้บอท")]
+    public string loseSceneName = "LoseScene";
+
+    [Tooltip("ระยะเวลาหน่วงก่อนโหลดฉากจบ (วินาที) เพื่อให้เสียงหรือเอฟเฟกต์เล่นจบ")]
+    public float delayBeforeGameOverScene = 1.0f;
+
+    [Tooltip("ลาก GameObject หรือ AudioSource ของเพลง BGM มาใส่ (ถ้าไม่ใส่ระบบจะหาให้อัตโนมัติ)")]
+    public AudioSource battleBgmAudioSource;
+
+    public enum TurnState { RepositionPhase, PlayerTurn, BotTurn, WaitingForProjectile, GameOver }
     public TurnState currentState;
 
     private float currentTimer;
     private bool isTimerRunning = false;
     private bool wasPlayerLastThrow = false;
+    private bool isGameOver = false;
 
     void Start()
     {
+        if (battleBgmAudioSource == null)
+        {
+            GameObject bgmObj = GameObject.Find("BGM_Battle");
+            if (bgmObj != null)
+            {
+                battleBgmAudioSource = bgmObj.GetComponent<AudioSource>();
+            }
+        }
+
         StartPlayerRepositionPhase();
     }
 
     void Update()
     {
-        if (!isTimerRunning) return;
+        if (isGameOver || !isTimerRunning) return;
 
         currentTimer -= Time.deltaTime;
 
@@ -48,8 +72,11 @@ public class TurnManager : MonoBehaviour
             OnTimeOut();
         }
     }
+
     public void StartPlayerRepositionPhase()
     {
+        if (isGameOver) return;
+
         currentState = TurnState.RepositionPhase;
         if (turnText != null)
         {
@@ -61,15 +88,19 @@ public class TurnManager : MonoBehaviour
         currentTimer = repositionDuration;
         isTimerRunning = true;
     }
+
     public void ConfirmRepositionEarly()
     {
-        if (currentState == TurnState.RepositionPhase)
+        if (currentState == TurnState.RepositionPhase && !isGameOver)
         {
             StartPlayerTurn();
         }
     }
+
     public void StartPlayerTurn()
     {
+        if (isGameOver) return;
+
         currentState = TurnState.PlayerTurn;
         if (turnText != null)
         {
@@ -83,8 +114,11 @@ public class TurnManager : MonoBehaviour
         currentTimer = turnDuration;
         isTimerRunning = true;
     }
+
     public void StartBotTurn()
     {
+        if (isGameOver) return;
+
         currentState = TurnState.BotTurn;
         if (turnText != null)
         {
@@ -99,6 +133,7 @@ public class TurnManager : MonoBehaviour
 
     private void OnTimeOut()
     {
+        if (isGameOver) return;
         isTimerRunning = false;
 
         if (currentState == TurnState.RepositionPhase)
@@ -121,6 +156,8 @@ public class TurnManager : MonoBehaviour
 
     public void OnItemThrown(bool isPlayer)
     {
+        if (isGameOver) return;
+
         isTimerRunning = false;
         wasPlayerLastThrow = isPlayer;
         currentState = TurnState.WaitingForProjectile;
@@ -134,12 +171,15 @@ public class TurnManager : MonoBehaviour
 
     public void OnProjectileDestroyed()
     {
+        if (isGameOver) return;
         StartCoroutine(SwitchTurnRoutine());
     }
 
     private IEnumerator SwitchTurnRoutine()
     {
         yield return new WaitForSeconds(0.6f);
+
+        if (isGameOver) yield break;
 
         if (wasPlayerLastThrow)
         {
@@ -148,8 +188,53 @@ public class TurnManager : MonoBehaviour
         else
         {
             PropSpawner.Instance?.RespawnAllProps();
-
             StartPlayerRepositionPhase();
         }
+    }
+    public void OnPlayerWin()
+    {
+        if (isGameOver) return;
+        isGameOver = true;
+        isTimerRunning = false;
+        currentState = TurnState.GameOver;
+
+        if (turnText != null)
+        {
+            turnText.text = "VICTORY!";
+            turnText.color = Color.green;
+        }
+
+        StopBattleBGM();
+        StartCoroutine(LoadGameOverSceneRoutine(winSceneName));
+    }
+    public void OnPlayerLose()
+    {
+        if (isGameOver) return;
+        isGameOver = true;
+        isTimerRunning = false;
+        currentState = TurnState.GameOver;
+
+        if (turnText != null)
+        {
+            turnText.text = "DEFEAT!";
+            turnText.color = Color.red;
+        }
+
+        StopBattleBGM();
+        StartCoroutine(LoadGameOverSceneRoutine(loseSceneName));
+    }
+
+    private void StopBattleBGM()
+    {
+        if (battleBgmAudioSource != null && battleBgmAudioSource.isPlaying)
+        {
+            battleBgmAudioSource.Stop();
+        }
+    }
+
+    private IEnumerator LoadGameOverSceneRoutine(string sceneName)
+    {
+        yield return new WaitForSeconds(delayBeforeGameOverScene);
+        SceneManager.LoadScene(sceneName);
     }
 }

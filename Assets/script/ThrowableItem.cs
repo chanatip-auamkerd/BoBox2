@@ -7,6 +7,11 @@ public class ThrowableItem : MonoBehaviour
     public float baseDamage = 20f;
     public float bonusDamagePerBounce = 5f;
 
+    [Header("Self Damage Settings")]
+    [Tooltip("ตัวคูณดาเมจเมื่อเด้งกลับมาโดนตัวเอง (เช่น 0.25 คือโดนเบาลงเหลือ 25% ของดาเมจปกติ)")]
+    [Range(0.05f, 0.5f)]
+    public float selfDamageMultiplier = 0.25f;
+
     [Header("Bounce Settings")]
     public int maxGroundHits = 2;
     public float maxLifeTime = 8f;
@@ -32,6 +37,7 @@ public class ThrowableItem : MonoBehaviour
     private int groundHitCount = 0;
     private bool isDestroyed = false;
     private Coroutine cutOffCoroutine;
+    private GameObject thrower;
 
     void Awake()
     {
@@ -42,7 +48,7 @@ public class ThrowableItem : MonoBehaviour
         }
         audioSource.playOnAwake = false;
         audioSource.loop = false;
-        audioSource.spatialBlend = 0f; 
+        audioSource.spatialBlend = 0f;
     }
 
     void Start()
@@ -50,22 +56,51 @@ public class ThrowableItem : MonoBehaviour
         Destroy(gameObject, maxLifeTime);
     }
 
+    public void SetThrower(GameObject shooter)
+    {
+        thrower = shooter;
+    }
+
     private void OnCollisionEnter2D(Collision2D collision)
     {
         if (isDestroyed) return;
 
+        if (collision.gameObject.CompareTag("OutZone"))
+        {
+            Debug.Log("🚫 ลูกบอลหลุดออกนอกแมพ! ทำลายลูกบอลทันที");
+            DestroyProjectile();
+            return;
+        }
+
         CharacterHealth health = collision.gameObject.GetComponent<CharacterHealth>();
+        if (health == null)
+        {
+            health = collision.gameObject.GetComponentInParent<CharacterHealth>();
+        }
+
         if (health != null)
         {
             float totalDamage = baseDamage + (currentTotalBounces * bonusDamagePerBounce);
+            bool isSelf = (thrower != null && (collision.gameObject == thrower || collision.transform.IsChildOf(thrower.transform)));
+
+            if (isSelf)
+            {
+                totalDamage *= selfDamageMultiplier;
+                Debug.Log($"<color=orange>⚠️ บอลเด้งกลับมาโดนตัวเอง! โดนดาเมจเบาลงเหลือ: {totalDamage}</color>");
+            }
+            else
+            {
+                Debug.Log($"<color=red>💥 โดนเป้าหมาย! เด้ง {currentTotalBounces} ครั้ง | ดาเมจรวม: {totalDamage}</color>");
+            }
+
             health.TakeDamage(totalDamage);
 
             if (hitTargetSound != null)
             {
-                AudioSource.PlayClipAtPoint(hitTargetSound, transform.position);
+                float sfxMaster = (SoundManager.Instance != null) ? SoundManager.Instance.SFXVolume : 1.0f;
+                AudioSource.PlayClipAtPoint(hitTargetSound, transform.position, sfxMaster);
             }
 
-            Debug.Log($"💥 โดนเป้าหมาย! เด้ง {currentTotalBounces} ครั้ง | ดาเมจรวม: {totalDamage}");
             DestroyProjectile();
             return;
         }
@@ -78,14 +113,14 @@ public class ThrowableItem : MonoBehaviour
         if (isProp || isWall)
         {
             currentTotalBounces++;
-            PlayInstantFirstBounceSound(); 
+            PlayInstantFirstBounceSound();
             ComboUI.Instance?.ShowCombo(currentTotalBounces);
         }
         else if (isGround)
         {
             groundHitCount++;
             currentTotalBounces++;
-            PlayInstantFirstBounceSound(); 
+            PlayInstantFirstBounceSound();
             ComboUI.Instance?.ShowCombo(currentTotalBounces);
 
             if (groundHitCount >= maxGroundHits)
@@ -106,9 +141,11 @@ public class ThrowableItem : MonoBehaviour
         }
         audioSource.Stop();
 
+        float sfxMaster = (SoundManager.Instance != null) ? SoundManager.Instance.SFXVolume : 1.0f;
+        audioSource.volume = sfxMaster;
         audioSource.clip = bounceSound;
         audioSource.pitch = Random.Range(minPitch, maxPitch);
-        audioSource.time = bounceStartTime; 
+        audioSource.time = bounceStartTime;
         audioSource.Play();
         cutOffCoroutine = StartCoroutine(StopSoundAfterDuration(bounceDuration));
     }

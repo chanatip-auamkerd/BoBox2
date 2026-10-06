@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -51,14 +52,28 @@ public class PlayerController : MonoBehaviour
     public TextMeshProUGUI lockButtonText;
     public Button throwButton;
 
+    [Header("Action Audio Feedback")]
+    [Tooltip("ใส่ไฟล์เสียงคลิก เช่น Clck1")]
+    public AudioClip actionClickSound;
+    [Tooltip("จุดเริ่มเสียงที่ข้ามช่วงเงียบ (เช่น 0.48 วิ)")]
+    public float actionSoundStartTime = 0.48f;
+    [Range(0f, 1f)]
+    public float actionSoundVolume = 1.0f;
+
     private Vector2 currentLaunchVelocity;
     private Collider2D playerCollider;
+    private AudioSource actionAudioSource;
 
     void Awake()
     {
         groundFixedY = transform.position.y;
         playerCollider = GetComponent<Collider2D>();
         spriteRenderer = GetComponent<SpriteRenderer>();
+
+        actionAudioSource = gameObject.AddComponent<AudioSource>();
+        actionAudioSource.playOnAwake = false;
+        actionAudioSource.loop = false;
+        actionAudioSource.spatialBlend = 0f;
     }
 
     void Start()
@@ -82,6 +97,20 @@ public class PlayerController : MonoBehaviour
 
         HandleAimingInput();
     }
+
+    public void PlayActionSound()
+    {
+        if (actionClickSound == null || actionAudioSource == null) return;
+
+        float sfxMaster = (SoundManager.Instance != null) ? SoundManager.Instance.SFXVolume : 1.0f;
+        actionAudioSource.clip = actionClickSound;
+        actionAudioSource.volume = actionSoundVolume * sfxMaster;
+
+        float validStart = Mathf.Clamp(actionSoundStartTime, 0f, actionClickSound.length - 0.05f);
+        actionAudioSource.time = validStart;
+        actionAudioSource.Play();
+    }
+
     public void SetVisualPose(bool isThrowPose)
     {
         if (spriteRenderer == null) spriteRenderer = GetComponent<SpriteRenderer>();
@@ -148,6 +177,7 @@ public class PlayerController : MonoBehaviour
             throwButton.interactable = isMyTurn && isAimLocked && !isRepositionMode;
         }
     }
+
     private void HandleRepositionInput()
     {
         transform.position = new Vector3(transform.position.x, groundFixedY, transform.position.z);
@@ -208,6 +238,7 @@ public class PlayerController : MonoBehaviour
 
     public void ConfirmPosition()
     {
+        PlayActionSound(); 
         isDragging = false;
 
         var soloManager = FindAnyObjectByType<TurnManager>();
@@ -223,6 +254,7 @@ public class PlayerController : MonoBehaviour
             pvpManager.ConfirmRepositionEarly();
         }
     }
+
     private void HandleAimingInput()
     {
         if (!isAimLocked)
@@ -233,7 +265,7 @@ public class PlayerController : MonoBehaviour
                 mouseScreenPos.z = Mathf.Abs(Camera.main.transform.position.z);
             }
             Vector3 mouseWorldPos = Camera.main.ScreenToWorldPoint(mouseScreenPos);
-            mouseWorldPos.z = 0f; 
+            mouseWorldPos.z = 0f;
 
             Vector3 startPos = throwPoint != null ? throwPoint.position : transform.position;
             startPos.z = 0f;
@@ -258,13 +290,13 @@ public class PlayerController : MonoBehaviour
         }
         else
         {
-            if (Input.GetKeyDown(KeyCode.Space) || Input.GetMouseButtonDown(0))
-            {
-                Throw();
-            }
-            else if (Input.GetMouseButtonDown(1))
+            if (Input.GetKeyDown(KeyCode.Escape) || Input.GetMouseButtonDown(1))
             {
                 ToggleLockAim();
+            }
+            else if (Input.GetKeyDown(KeyCode.Space) || Input.GetMouseButtonDown(0))
+            {
+                Throw();
             }
         }
     }
@@ -272,6 +304,8 @@ public class PlayerController : MonoBehaviour
     public void ToggleLockAim()
     {
         if (!isMyTurn || isRepositionMode) return;
+
+        PlayActionSound(); 
 
         isAimLocked = !isAimLocked;
         SetVisualPose(isAimLocked);
@@ -300,6 +334,8 @@ public class PlayerController : MonoBehaviour
             return;
         }
 
+        PlayActionSound(); 
+
         OnThrowAnimationRequested?.Invoke();
 
         isMyTurn = false;
@@ -311,10 +347,17 @@ public class PlayerController : MonoBehaviour
         GameObject proj = Instantiate(projectilePrefab, throwPoint.position, Quaternion.identity);
         proj.tag = "Projectile";
 
+        ThrowableItem itemScript = proj.GetComponent<ThrowableItem>();
+        if (itemScript != null)
+        {
+            itemScript.SetThrower(this.gameObject);
+        }
+
         Collider2D projCol = proj.GetComponent<Collider2D>();
         if (playerCollider != null && projCol != null)
         {
-            Physics2D.IgnoreCollision(playerCollider, projCol);
+            Physics2D.IgnoreCollision(playerCollider, projCol, true);
+            StartCoroutine(ReEnableSelfCollisionRoutine(playerCollider, projCol, 0.15f));
         }
 
         Rigidbody2D rb = proj.GetComponent<Rigidbody2D>();
@@ -336,6 +379,15 @@ public class PlayerController : MonoBehaviour
         if (pvpManager != null)
         {
             pvpManager.OnItemThrown(playerIndex);
+        }
+    }
+
+    private IEnumerator ReEnableSelfCollisionRoutine(Collider2D playerCol, Collider2D projCol, float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        if (playerCol != null && projCol != null)
+        {
+            Physics2D.IgnoreCollision(playerCol, projCol, false);
         }
     }
 }

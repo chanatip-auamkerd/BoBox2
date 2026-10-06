@@ -18,6 +18,19 @@ public class CharacterHealth : MonoBehaviour
     public float currentHealth;
     public Slider healthSlider;
 
+    [Header("Hurt Sound Timing (ปรับแต่งช่วงเสียงเองได้)")]
+    [Tooltip("ใส่ไฟล์เสียงเจ็บ SufferingDamage1")]
+    public AudioClip hurtSoundClip;
+
+    [Tooltip("วินาทีเริ่มต้นของท่อนเสียงที่ต้องการ (เช่น 2.5)")]
+    public float hurtStartTime = 2.50f;
+
+    [Tooltip("วินาทีสิ้นสุดของท่อนเสียง (ถ้าตั้งค่านี้ ระบบจะหยุดเล่นเมื่อถึงวินาทีนี้)")]
+    public float hurtEndTime = 3.35f;
+
+    [Range(0f, 1f)]
+    public float hurtVolume = 1.0f;
+
     [Header("Scene Settings")]
     [Tooltip("ชื่อ Scene หน้าจบเกมของโหมด PvP")]
     public string pvpGameOverScene = "PvP_GameOverScene";
@@ -26,6 +39,28 @@ public class CharacterHealth : MonoBehaviour
     public float sceneLoadDelay = 1.0f;
 
     private bool isDead = false;
+    private AudioSource audioSource;
+    private Coroutine stopHurtCoroutine;
+
+    void Awake()
+    {
+        SetupAudioSource();
+    }
+
+    private void SetupAudioSource()
+    {
+        if (audioSource == null)
+        {
+            audioSource = GetComponent<AudioSource>();
+            if (audioSource == null)
+            {
+                audioSource = gameObject.AddComponent<AudioSource>();
+            }
+        }
+        audioSource.playOnAwake = false;
+        audioSource.loop = false;
+        audioSource.spatialBlend = 0f;
+    }
 
     void Start()
     {
@@ -50,9 +85,50 @@ public class CharacterHealth : MonoBehaviour
             healthSlider.value = currentHealth;
         }
 
+        PlayHurtSound();
+
         if (currentHealth <= 0)
         {
             Die();
+        }
+    }
+
+    [ContextMenu("Test Hurt Sound")]
+    public void PlayHurtSound()
+    {
+        if (hurtSoundClip == null)
+        {
+            Debug.LogWarning($"[HurtSound] {gameObject.name}: ยังไม่ได้ใส่ไฟล์ AudioClip!");
+            return;
+        }
+
+        SetupAudioSource();
+
+        if (stopHurtCoroutine != null)
+        {
+            StopCoroutine(stopHurtCoroutine);
+        }
+
+        audioSource.Stop();
+        audioSource.clip = hurtSoundClip;
+
+        float sfxMaster = (SoundManager.Instance != null) ? SoundManager.Instance.SFXVolume : 1.0f;
+        audioSource.volume = hurtVolume * sfxMaster;
+
+        float validStart = Mathf.Clamp(hurtStartTime, 0f, hurtSoundClip.length - 0.05f);
+        audioSource.Play();
+        audioSource.time = validStart;
+
+        float duration = Mathf.Max(0.05f, hurtEndTime - validStart);
+        stopHurtCoroutine = StartCoroutine(StopHurtSoundRoutine(duration));
+    }
+
+    private IEnumerator StopHurtSoundRoutine(float duration)
+    {
+        yield return new WaitForSeconds(duration);
+        if (audioSource != null && audioSource.isPlaying)
+        {
+            audioSource.Stop();
         }
     }
 

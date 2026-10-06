@@ -17,6 +17,10 @@ public class TurnManagerPvP : MonoBehaviour
     public float repositionDuration = 10f;
     public float turnDuration = 15f;
 
+    [Header("Audio Settings (BGM)")]
+    [Tooltip("ลาก AudioSource ของ BGM_Battle มาใส่ (ถ้าเว้นว่างไว้ สคริปต์จะค้นหาให้อัตโนมัติ)")]
+    public AudioSource battleBgmAudioSource;
+
     [Header("Game Over Settings")]
     [Tooltip("ชื่อ Scene จบเกมของโหมด PvP")]
     public string pvpGameOverSceneName = "PvP_GameOverScene";
@@ -33,6 +37,15 @@ public class TurnManagerPvP : MonoBehaviour
 
     void Start()
     {
+        if (battleBgmAudioSource == null)
+        {
+            GameObject bgmObj = GameObject.Find("BGM_Battle");
+            if (bgmObj != null)
+            {
+                battleBgmAudioSource = bgmObj.GetComponent<AudioSource>();
+            }
+        }
+
         activePlayerIndex = 1;
 
         if (player1 != null)
@@ -183,6 +196,7 @@ public class TurnManagerPvP : MonoBehaviour
             StartRepositionPhase(player1);
         }
     }
+
     private bool CheckGameOver()
     {
         if (player1 != null && player1.GetComponent<CharacterHealth>() != null && player1.GetComponent<CharacterHealth>().currentHealth <= 0)
@@ -199,11 +213,12 @@ public class TurnManagerPvP : MonoBehaviour
 
         return false;
     }
+
     public void TriggerGameOver(string winner)
     {
         currentState = TurnState.GameOver;
         isTimerRunning = false;
-        winnerName = winner; 
+        winnerName = winner;
 
         if (turnText != null)
         {
@@ -211,12 +226,22 @@ public class TurnManagerPvP : MonoBehaviour
             turnText.color = winner == "Human" ? Color.cyan : Color.red;
         }
 
+        StopBattleBGM();
+
         StartCoroutine(LoadGameOverSceneRoutine());
+    }
+
+    private void StopBattleBGM()
+    {
+        if (battleBgmAudioSource != null && battleBgmAudioSource.isPlaying)
+        {
+            battleBgmAudioSource.Stop();
+        }
     }
 
     private IEnumerator LoadGameOverSceneRoutine()
     {
-        yield return new WaitForSeconds(1.5f); 
+        yield return new WaitForSeconds(1.5f);
         SceneManager.LoadScene(pvpGameOverSceneName);
     }
 
