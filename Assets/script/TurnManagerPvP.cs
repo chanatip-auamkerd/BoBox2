@@ -1,5 +1,6 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using TMPro;
 
 public class TurnManagerPvP : MonoBehaviour
@@ -16,13 +17,19 @@ public class TurnManagerPvP : MonoBehaviour
     public float repositionDuration = 10f;
     public float turnDuration = 15f;
 
-    public enum TurnState { RepositionPhase, AimPhase, WaitingForProjectile }
+    [Header("Game Over Settings")]
+    [Tooltip("ชื่อ Scene จบเกมของโหมด PvP")]
+    public string pvpGameOverSceneName = "PvP_GameOverScene";
+
+    public enum TurnState { RepositionPhase, AimPhase, WaitingForProjectile, GameOver }
     public TurnState currentState;
 
     public int activePlayerIndex = 1;
     private float currentTimer;
     private bool isTimerRunning = false;
     private int lastThrowPlayerIndex = 1;
+
+    public static string winnerName = "Human";
 
     void Start()
     {
@@ -70,6 +77,8 @@ public class TurnManagerPvP : MonoBehaviour
 
     public void StartRepositionPhase(PlayerController player)
     {
+        if (currentState == TurnState.GameOver) return;
+
         currentState = TurnState.RepositionPhase;
         activePlayerIndex = player.playerIndex;
 
@@ -95,6 +104,8 @@ public class TurnManagerPvP : MonoBehaviour
 
     public void StartAimPhase(PlayerController player)
     {
+        if (currentState == TurnState.GameOver) return;
+
         currentState = TurnState.AimPhase;
 
         if (turnText != null)
@@ -145,17 +156,23 @@ public class TurnManagerPvP : MonoBehaviour
 
     public void OnProjectileDestroyed()
     {
+        if (currentState == TurnState.GameOver) return;
         StartCoroutine(SwitchTurnRoutine());
     }
 
     private IEnumerator SwitchTurnRoutine()
     {
         yield return new WaitForSeconds(0.6f);
+
+        if (CheckGameOver()) yield break;
+
         SwitchToNextPlayer();
     }
 
     private void SwitchToNextPlayer()
     {
+        if (currentState == TurnState.GameOver) return;
+
         if (lastThrowPlayerIndex == 1)
         {
             StartRepositionPhase(player2);
@@ -165,6 +182,42 @@ public class TurnManagerPvP : MonoBehaviour
             PropSpawner.Instance?.RespawnAllProps();
             StartRepositionPhase(player1);
         }
+    }
+    private bool CheckGameOver()
+    {
+        if (player1 != null && player1.GetComponent<CharacterHealth>() != null && player1.GetComponent<CharacterHealth>().currentHealth <= 0)
+        {
+            TriggerGameOver("Ghost");
+            return true;
+        }
+
+        if (player2 != null && player2.GetComponent<CharacterHealth>() != null && player2.GetComponent<CharacterHealth>().currentHealth <= 0)
+        {
+            TriggerGameOver("Human");
+            return true;
+        }
+
+        return false;
+    }
+    public void TriggerGameOver(string winner)
+    {
+        currentState = TurnState.GameOver;
+        isTimerRunning = false;
+        winnerName = winner; 
+
+        if (turnText != null)
+        {
+            turnText.text = $"{winner.ToUpper()} WINS!";
+            turnText.color = winner == "Human" ? Color.cyan : Color.red;
+        }
+
+        StartCoroutine(LoadGameOverSceneRoutine());
+    }
+
+    private IEnumerator LoadGameOverSceneRoutine()
+    {
+        yield return new WaitForSeconds(1.5f); 
+        SceneManager.LoadScene(pvpGameOverSceneName);
     }
 
     public PlayerController GetActivePlayer() => activePlayerIndex == 1 ? player1 : player2;

@@ -10,7 +10,7 @@ public class CharacterHealth : MonoBehaviour
 
     [Header("Identity")]
     public bool isPlayer = true;
-    [Tooltip("1 สำหรับ P1, 2 สำหรับ P2")]
+    [Tooltip("1 สำหรับ P1 (คน), 2 สำหรับ P2 (ผี)")]
     public int playerIndex = 1;
 
     [Header("Health Settings")]
@@ -61,29 +61,32 @@ public class CharacterHealth : MonoBehaviour
         if (isDead) return;
         isDead = true;
 
-        FindAnyObjectByType<TurnManager>()?.gameObject.SetActive(false);
-        FindAnyObjectByType<TurnManagerPvP>()?.gameObject.SetActive(false);
+        var pvpManager = FindAnyObjectByType<TurnManagerPvP>(FindObjectsInactive.Include);
+        bool isPvP = (pvpManager != null);
+        var soloManager = FindAnyObjectByType<TurnManager>(FindObjectsInactive.Include);
+        if (soloManager != null) soloManager.enabled = false;
+        if (pvpManager != null) pvpManager.enabled = false;
 
-        StartCoroutine(LoadGameOverSceneRoutine());
+        StartCoroutine(LoadGameOverSceneRoutine(isPvP));
     }
 
-    private IEnumerator LoadGameOverSceneRoutine()
+    private IEnumerator LoadGameOverSceneRoutine(bool isPvP)
     {
         yield return new WaitForSeconds(sceneLoadDelay);
-
-        bool isPvP = FindAnyObjectByType<TurnManagerPvP>() != null || playerIndex == 2;
 
         if (isPvP)
         {
             if (playerIndex == 1)
             {
                 winnerIndex = 2;
-                winnerMessage = "PLAYER 2 WINS!";
+                winnerMessage = "GHOST WINS!";
+                TurnManagerPvP.winnerName = "Ghost";
             }
             else
             {
                 winnerIndex = 1;
-                winnerMessage = "PLAYER 1 WINS!";
+                winnerMessage = "HUMAN WINS!";
+                TurnManagerPvP.winnerName = "Human";
             }
 
             SceneManager.LoadScene(pvpGameOverScene);

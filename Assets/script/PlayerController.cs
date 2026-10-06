@@ -227,8 +227,18 @@ public class PlayerController : MonoBehaviour
     {
         if (!isAimLocked)
         {
-            Vector3 mousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
-            Vector2 aimVector = (Vector2)(mousePos - throwPoint.position);
+            Vector3 mouseScreenPos = Input.mousePosition;
+            if (Camera.main != null)
+            {
+                mouseScreenPos.z = Mathf.Abs(Camera.main.transform.position.z);
+            }
+            Vector3 mouseWorldPos = Camera.main.ScreenToWorldPoint(mouseScreenPos);
+            mouseWorldPos.z = 0f; 
+
+            Vector3 startPos = throwPoint != null ? throwPoint.position : transform.position;
+            startPos.z = 0f;
+
+            Vector2 aimVector = (Vector2)(mouseWorldPos - startPos);
             float dist = aimVector.magnitude;
             Vector2 launchDirection = aimVector.normalized;
 
@@ -238,7 +248,7 @@ public class PlayerController : MonoBehaviour
             if (trajectory != null)
             {
                 trajectory.ShowLine();
-                trajectory.DrawBounceTrajectory(throwPoint.position, currentLaunchVelocity, playerCollider);
+                trajectory.DrawBounceTrajectory(startPos, currentLaunchVelocity, playerCollider);
             }
 
             if (Input.GetKeyDown(KeyCode.Space) || Input.GetMouseButtonDown(1))

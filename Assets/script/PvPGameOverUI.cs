@@ -6,29 +6,26 @@ using TMPro;
 public class PvPGameOverUI : MonoBehaviour
 {
     [Header("UI References")]
+    [Tooltip("Text สำหรับแสดงว่าใครชนะ (HUMAN WINS! / GHOST WINS!)")]
     public TextMeshProUGUI winnerText;
+
+    [Tooltip("Text รองสำหรับคำแซว/คำขิง")]
+    public TextMeshProUGUI subWinnerText;
+
     public Button playAgainButton;
     public Button mainMenuButton;
 
     [Header("Scene Names")]
     public string pvpSceneName = "PvP_Scene";
-    public string mainMenuSceneName = "MainMenu"; 
+    public string mainMenuSceneName = "MainMenu_Scene";
+
+    [Header("Colors")]
+    public Color humanColor = Color.cyan;
+    public Color ghostColor = new Color(1f, 0.35f, 0.35f);
 
     void Start()
     {
-        if (winnerText != null)
-        {
-            winnerText.text = CharacterHealth.winnerMessage;
-
-            if (CharacterHealth.winnerIndex == 1)
-            {
-                winnerText.color = Color.cyan;
-            }
-            else
-            {
-                winnerText.color = new Color(1f, 0.35f, 0.35f);
-            }
-        }
+        SetupWinnerDisplay();
 
         if (playAgainButton != null)
         {
@@ -38,6 +35,38 @@ public class PvPGameOverUI : MonoBehaviour
         if (mainMenuButton != null)
         {
             mainMenuButton.onClick.AddListener(GoToMainMenu);
+        }
+    }
+
+    private void SetupWinnerDisplay()
+    {
+        bool isHumanWin = (CharacterHealth.winnerIndex == 1) || (TurnManagerPvP.winnerName == "Human");
+
+        if (isHumanWin)
+        {
+            if (winnerText != null)
+            {
+                winnerText.text = "HUMAN WINS!";
+                winnerText.color = humanColor;
+            }
+
+            if (subWinnerText != null)
+            {
+                subWinnerText.text = "THE GHOST GOT BUSTED!";
+            }
+        }
+        else 
+        {
+            if (winnerText != null)
+            {
+                winnerText.text = "GHOST WINS!";
+                winnerText.color = ghostColor;
+            }
+
+            if (subWinnerText != null)
+            {
+                subWinnerText.text = "YOU GOT SPOOKED, HUMAN!";
+            }
         }
     }
 
