@@ -1,35 +1,35 @@
 using UnityEngine;
 
+[RequireComponent(typeof(AudioSource))]
 public class AudioManager : MonoBehaviour
 {
-    public static AudioManager Instance;
+    public static AudioManager Instance { get; private set; }
 
     [Header("UI Audio Settings")]
-    [Tooltip("ใส่ไฟล์เสียงคลิกปุ่ม Click1")]
     public AudioClip buttonClickSound;
-
-    [Header("Timing Settings")]
-    [Tooltip("จุดเริ่มเสียงคลิกจริง (วินาที)")]
-    public float clickStartTime = 0.50f;
+    [Range(0f, 1f)]
+    public float clickVolume = 1.0f;
 
     private AudioSource audioSource;
 
-    private void Awake()
+    void Awake()
     {
         if (Instance == null)
         {
             Instance = this;
-            DontDestroyOnLoad(gameObject);
+            DontDestroyOnLoad(gameObject); 
 
             audioSource = GetComponent<AudioSource>();
             if (audioSource == null)
             {
                 audioSource = gameObject.AddComponent<AudioSource>();
             }
+
             audioSource.playOnAwake = false;
-            audioSource.spatialBlend = 0f;
+            audioSource.loop = false;
+            audioSource.spatialBlend = 0f; 
         }
-        else if (Instance != this)
+        else
         {
             Destroy(gameObject);
         }
@@ -42,12 +42,10 @@ public class AudioManager : MonoBehaviour
         if (audioSource == null)
         {
             audioSource = GetComponent<AudioSource>();
-            if (audioSource == null) audioSource = gameObject.AddComponent<AudioSource>();
         }
 
-        audioSource.Stop();
-        audioSource.clip = buttonClickSound;
-        audioSource.time = clickStartTime;
-        audioSource.Play();
+        float sfxScale = (SoundManager.Instance != null) ? SoundManager.Instance.SFXVolume : 1.0f;
+
+        audioSource.PlayOneShot(buttonClickSound, clickVolume * sfxScale);
     }
 }
